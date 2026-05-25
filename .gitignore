@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.env
+.env.local
+# Mission revision worktrees (Fase 4 C4)
+.worktrees/
