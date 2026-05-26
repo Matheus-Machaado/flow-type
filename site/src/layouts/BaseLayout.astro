@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import { V_TAG, SETUP_EXE } from "../lib/version";
 
 interface Props {
   title?: string;
@@ -22,7 +23,7 @@ const fullOg = new URL(ogImage, siteUrl).toString();
 // COMMIT_SHA injetado em build via scripts/inject-version.mjs (substitui __COMMIT_SHA__).
 // Em dev (sem build) fica como string literal — sem efeito.
 const commitSha = "__COMMIT_SHA__";
-const version = "v0.1.0";
+const version = V_TAG;
 ---
 
 <!doctype html>

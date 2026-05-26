@@ -1,5 +1,6 @@
 ---
 import Icon from "./icons/Icon.astro";
+import { V_TAG, SIZE_MB } from "../lib/version";
 ---
 
 <section class="relative overflow-hidden" aria-labelledby="hero-h1">
@@ -14,7 +15,7 @@ import Icon from "./icons/Icon.astro";
       class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-bg-2 border border-accent/30 text-[11px] font-mono text-accent mb-6 animate-fade-in-up"
     >
       <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" aria-hidden="true"></span>
-      <span>v0.1 · Windows · 100% free</span>
+      <span>{V_TAG} · Windows · 100% free</span>
     </div>
 
     <h1
@@ -44,7 +45,7 @@ import Icon from "./icons/Icon.astro";
       >
         <Icon name="download" size={16} />
         <span>Baixar para Windows</span>
-        <span class="text-[10px] opacity-70 font-mono">v0.1.0 · 180 MB</span>
+        <span class="text-[10px] opacity-70 font-mono">{V_TAG} · {SIZE_MB} MB</span>
       </a>
       <a
         href="#how-it-works"

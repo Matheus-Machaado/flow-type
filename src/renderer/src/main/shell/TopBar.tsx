@@ -1,5 +1,6 @@
 import { cn } from '../../shared/lib/cn'
 import { FlowTypeMark } from './FlowTypeMark'
+import { APP_VERSION_TAG } from '../../shared/lib/app-version'
 import type { RouteId } from '../App'
 
 /**
@@ -28,7 +29,7 @@ export function TopBar({
         <span className="text-sm font-semibold tracking-tight text-text-primary group-hover:text-accent transition-colors">
           Flow Type
         </span>
-        <span className="text-[10px] font-mono text-text-faint ml-1">v0.1.0</span>
+        <span className="text-[10px] font-mono text-text-faint ml-1">{APP_VERSION_TAG}</span>
       </button>
 
       <nav aria-label="Main navigation" className="flex items-center gap-1">

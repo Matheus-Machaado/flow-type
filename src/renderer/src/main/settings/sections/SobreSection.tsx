@@ -2,6 +2,7 @@ import { Badge } from '../../../shared/components/Badge'
 import { Button } from '../../../shared/components/Button'
 import { Card } from '../../../shared/components/Card'
 import { FlowTypeMark } from '../../shell/FlowTypeMark'
+import { APP_VERSION_TAG } from '../../../shared/lib/app-version'
 
 /**
  * SobreSection — versão, links externos. Brand "Flow Type" capitalized.
@@ -15,7 +16,7 @@ export function SobreSection(): JSX.Element {
           <FlowTypeMark size={32} />
           <div>
             <div className="text-sm font-semibold text-text-primary">Flow Type</div>
-            <div className="text-[10px] text-text-muted font-mono">v0.1.0</div>
+            <div className="text-[10px] text-text-muted font-mono">{APP_VERSION_TAG}</div>
           </div>
           <Badge tone="accent" className="ml-auto">
             preview

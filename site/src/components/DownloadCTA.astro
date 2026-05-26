@@ -1,16 +1,25 @@
 ---
 import Icon from "./icons/Icon.astro";
+import {
+  V_TAG,
+  SIZE_MB,
+  SETUP_EXE,
+  PORTABLE_EXE,
+  SHA256_SETUP,
+  DOWNLOAD_URL_EXE,
+  DOWNLOAD_URL_ZIP,
+  CHECKSUMS_URL,
+} from "../lib/version";
 
-const version = "v0.1.5";
-const exeFile = `flowtype-setup-${version}.exe`;
-const portableFile = `flowtype-portable-${version}.exe`;
-// SHA-256 do build v0.1.5 (gerado 2026-05-26 via PowerShell Get-FileHash).
-const sha256 =
-  "3c42357e3ffb0f0f4b080b24261d34dd43f7d753c0ccdd430287cd31f5f81cdf";
-const sizeMb = "83 MB";
-const downloadUrlExe = `/download/${exeFile}`;
-const downloadUrlZip = `/download/${portableFile}`;
-const checksumUrl = "/download/checksums.txt";
+// Aliases locais — mantêm o template inalterado abaixo.
+const version = V_TAG;
+const exeFile = SETUP_EXE;
+const portableFile = PORTABLE_EXE;
+const sha256 = SHA256_SETUP;
+const sizeMb = `${SIZE_MB} MB`;
+const downloadUrlExe = DOWNLOAD_URL_EXE;
+const downloadUrlZip = DOWNLOAD_URL_ZIP;
+const checksumUrl = CHECKSUMS_URL;
 ---
 
 <section id="download" class="scroll-mt-24" aria-labelledby="dl-h2">
