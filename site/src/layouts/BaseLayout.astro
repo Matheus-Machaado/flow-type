@@ -1,0 +1,99 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+  canonical?: string;
+}
+
+const {
+  title = "Flow Type — sua voz vira texto onde você estiver",
+  description = "Dictation universal pra Windows. Segure Right Ctrl, fale, solta. Texto cola em qualquer app em menos de 1 segundo. Free, sem limite, com fallback local offline.",
+  ogImage = "/og-image.svg",
+  canonical = Astro.url.pathname,
+} = Astro.props;
+
+const siteUrl = "https://flowtype.app";
+const fullCanonical = new URL(canonical, siteUrl).toString();
+const fullOg = new URL(ogImage, siteUrl).toString();
+
+// COMMIT_SHA injetado em build via scripts/inject-version.mjs (substitui __COMMIT_SHA__).
+// Em dev (sem build) fica como string literal — sem efeito.
+const commitSha = "__COMMIT_SHA__";
+const version = "v0.1.0";
+---
+
+<!doctype html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#060708" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={fullCanonical} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Flow Type" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={fullCanonical} />
+    <meta property="og:image" content={fullOg} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={fullOg} />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Robots / sitemap -->
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <!-- DNS prefetch / preconnect — sem CDN externa; só self -->
+    <!-- (Fonts são self-hosted via @fontsource-variable, sem preconnect externo.) -->
+
+    <!-- JSON-LD: SoftwareApplication -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Flow Type",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "Windows 10, Windows 11",
+      "description": description,
+      "url": siteUrl,
+      "downloadUrl": `${siteUrl}/download/flowtype-setup-${version}.exe`,
+      "softwareVersion": version,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+      },
+      "author": { "@type": "Organization", "name": "Flow Type" },
+    })} />
+
+    <!-- Asset version meta (auditoria / debug em prod) -->
+    <meta name="flowtype-build" content={commitSha} />
+  </head>
+  <body class="font-sans antialiased">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-lg focus:bg-accent focus:text-bg-0 focus:font-semibold"
+    >
+      Pular para conteúdo principal
+    </a>
+    <slot />
+  </body>
+</html>

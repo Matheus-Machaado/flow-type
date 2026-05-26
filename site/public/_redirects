@@ -1,0 +1,15 @@
+# flowtype site — Cloudflare Pages redirects
+# Lição feedback_netlify_publish_root_protect: bloquear paths sensíveis com 404
+# Sintaxe: <from> <to> <status>
+
+# Bloqueia paths comuns que ferramentas/bots procuram
+/admin           /404           404!
+/admin/*         /404           404!
+/wp-admin/*      /404           404!
+/wp-login.php    /404           404!
+/.env            /404           404!
+/.git/*          /404           404!
+/.studio/*       /404           404!
+
+# Catch-all 404 (Astro emite 404.html automaticamente quando existe)
+/*               /404           404

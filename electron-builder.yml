@@ -1,0 +1,73 @@
+appId: com.flowtype.app
+productName: Flow Type
+copyright: Copyright (c) 2026 Matheus Machado
+directories:
+  output: dist-installer
+  buildResources: resources
+
+# uIOhook + nut.js + better-sqlite3 ship prebuilds for win32-x64. We disable
+# the electron-builder rebuild step because (a) the prebuilds are correct
+# for Electron 31's ABI and (b) the build host might not have Python/MSVC
+# installed. To force a real rebuild before publishing, run:
+#   npx electron-rebuild -f -w better-sqlite3 -w uiohook-napi -w @nut-tree-fork/nut-js
+# before `npm run dist` — see RELEASE_CHECKLIST.md.
+npmRebuild: false
+buildDependenciesFromSource: false
+
+# Bundle compiled main+preload+renderer, plus runtime resources and the native
+# modules that must live outside the asar archive (Electron cannot dlopen()
+# binaries from inside an asar package).
+files:
+  - out/**/*
+  - package.json
+  - resources/**/*
+  - node_modules/uiohook-napi/**/*
+  - node_modules/@nut-tree-fork/nut-js/**/*
+  - node_modules/better-sqlite3/**/*
+
+asarUnpack:
+  - node_modules/uiohook-napi/**/*
+  - node_modules/@nut-tree-fork/nut-js/**/*
+  - node_modules/better-sqlite3/**/*
+  - resources/whisper-runner.py
+  - resources/tray-icon.png
+
+# Ship the Python runner and the tray icon as plain files next to the app
+# binary so the local faster-whisper fallback can spawn the script with
+# `python resources/whisper-runner.py` regardless of asar packaging.
+#
+# faster-whisper itself (~140 MB) is NOT bundled in v0.1 — first launch shows
+# a "Detect & download local model" CTA in Settings. This keeps the installer
+# small and the cloud-first promise honest.
+extraResources:
+  - from: resources/whisper-runner.py
+    to: whisper-runner.py
+  - from: resources/tray-icon.png
+    to: tray-icon.png
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # No code signing in v0.1 (ADR-15). Users will see a SmartScreen warning;
+  # README and the site FAQ explain that this is expected.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Flow Type
+  installerIcon: resources/tray-icon.ico
+  uninstallerIcon: resources/tray-icon.ico
+  artifactName: ${productName} Setup ${version}.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+# No auto-update / publishing in v0.1 — releases are manual.
+publish: null

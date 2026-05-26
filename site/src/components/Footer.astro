@@ -1,0 +1,91 @@
+---
+import Logo from "./icons/Logo.astro";
+import Icon from "./icons/Icon.astro";
+
+const version = "v0.1.0";
+const year = new Date().getFullYear();
+
+const columns = [
+  {
+    title: "Produto",
+    items: [
+      { label: "Download", href: "#download" },
+      { label: "Features", href: "#features" },
+      { label: "Como funciona", href: "#how-it-works" },
+      { label: "Screenshots", href: "#screenshots" },
+    ],
+  },
+  {
+    title: "Docs",
+    items: [
+      { label: "FAQ", href: "#faq" },
+      { label: "Changelog", href: "/changelog", external: false },
+      { label: "Privacidade", href: "/privacy", external: false },
+      { label: "Licença (MIT)", href: "/license", external: false },
+    ],
+  },
+  {
+    title: "Comunidade",
+    items: [
+      { label: "GitHub", href: "https://github.com/flowtypeapp/flowtype", external: true },
+      { label: "Issues / bugs", href: "https://github.com/flowtypeapp/flowtype/issues", external: true },
+      { label: "Discussions", href: "https://github.com/flowtypeapp/flowtype/discussions", external: true },
+    ],
+  },
+  {
+    title: "Legal",
+    items: [
+      { label: "Privacy policy", href: "/privacy" },
+      { label: "Termos", href: "/terms" },
+      { label: "Suporte", href: "mailto:hello@flowtype.app" },
+    ],
+  },
+];
+---
+
+<footer class="border-t border-border bg-bg-0 mt-12" aria-labelledby="footer-h">
+  <h2 id="footer-h" class="sr-only">Rodapé</h2>
+  <div class="max-w-6xl mx-auto px-6 py-12 sm:py-16">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
+      {
+        columns.map((col) => (
+          <div>
+            <h3 class="text-[10px] font-mono uppercase tracking-wider text-muted font-semibold mb-4">
+              {col.title}
+            </h3>
+            <ul class="flex flex-col gap-2.5">
+              {col.items.map((item) => (
+                <li>
+                  <a
+                    href={item.href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noopener noreferrer" : undefined}
+                    class="text-sm text-fg-soft hover:text-accent transition-colors inline-flex items-center gap-1.5"
+                  >
+                    {item.label}
+                    {item.external && <Icon name="external" size={11} class="opacity-60" />}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <div
+      class="pt-6 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+    >
+      <div class="flex items-center gap-3">
+        <Logo size={24} />
+        <div class="flex flex-col">
+          <span class="text-xs font-mono text-fg-soft">Flow Type {version}</span>
+          <span class="text-[10px] font-mono text-faint">Made for human voice.</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-[10px] font-mono text-faint">
+        <span>© {year} Flow Type · MIT license</span>
+      </div>
+    </div>
+  </div>
+</footer>

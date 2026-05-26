@@ -1,0 +1,74 @@
+---
+import Icon from "./icons/Icon.astro";
+
+const features = [
+  {
+    icon: "keyboard",
+    title: "Hotkey global",
+    body: "Right Ctrl default, customizável. Detecção robusta de hold/release via uIOhook nativo.",
+  },
+  {
+    icon: "bolt",
+    title: "Sub-1s STT",
+    body: "Groq Whisper Large v3 Turbo. p50 720 ms do hotkey ao paste no campo ativo.",
+  },
+  {
+    icon: "laptop",
+    title: "Fallback local",
+    body: "faster-whisper small.en bundled. Quando offline, transcreve local sem depender de cloud.",
+  },
+  {
+    icon: "book",
+    title: "Vocabulário custom",
+    body: "Lista term_wrong → term_correct, global ou por app (Cunha em vez de kunha).",
+  },
+  {
+    icon: "history",
+    title: "Histórico FTS5",
+    body: "Busca full-text instantânea, filtros por data/app, export Markdown ou JSON.",
+  },
+  {
+    icon: "target",
+    title: "Overlay 4 estados",
+    body: "idle, armed, capturing, processing. Always-on-top, 200×64 px, hot-corner reveal.",
+  },
+  {
+    icon: "power",
+    title: "Auto-start Windows",
+    body: "Liga junto com o login. Roda silencioso no tray — abre Settings ou Histórico on-demand.",
+  },
+  {
+    icon: "code",
+    title: "Paste universal",
+    body: "Clipboard pattern + Ctrl+V via nut.js + re-foco anti perda. Funciona em qualquer app.",
+  },
+  {
+    icon: "shield",
+    title: "Privacy-aware",
+    body: "Toggle 'forçar local sempre' — nenhum áudio sai da máquina. Open source, auditável.",
+  },
+];
+---
+
+<section id="features" class="scroll-mt-24" aria-labelledby="features-h2">
+  <div class="max-w-6xl mx-auto px-6 py-16 sm:py-20">
+    <div class="text-center mb-10">
+      <h2 id="features-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">Features</h2>
+      <p class="text-sm text-muted mt-3">9 capacidades pensadas pra quem digita o dia inteiro.</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {
+        features.map((f) => (
+          <article class="surface-card p-5 transition-all hover:border-accent/40 hover:shadow-glow hover:-translate-y-0.5">
+            <div class="text-accent mb-3">
+              <Icon name={f.icon as any} size={22} />
+            </div>
+            <h3 class="text-sm font-semibold tracking-tight text-fg">{f.title}</h3>
+            <p class="text-xs text-fg-soft mt-2 leading-relaxed">{f.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>

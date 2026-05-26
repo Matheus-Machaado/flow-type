@@ -1,0 +1,1224 @@
+{
+  "missionId": "MIS-0024",
+  "generatedAt": "2026-05-25T15:30:00.000Z",
+  "features": [
+    {
+      "id": "e1-app-shell",
+      "name": "App shell Electron com janela principal oculta e tray",
+      "description": "Electron app (TS+React+electron-vite) inicia com janela principal oculta. Settings e Histórico são janelas separadas abertas on-demand via tray ou hotkey. Tray icon sempre presente.",
+      "acceptance_criteria": [
+        "App boota sem janela visível (mainWindow.show=false) — só overlay + tray",
+        "Tray icon presente com tooltip 'flowtype'",
+        "Menu tray contém: Settings, Histórico, Mute on/off, Sair",
+        "Click direito no tray abre menu; click esquerdo abre Settings",
+        "Quit pelo tray encerra todos processos (overlay + main + python child)"
+      ],
+      "test_scenario": "launch electron app → expect mainWindow.isVisible()=false → expect tray icon present → right-click tray → expect context menu with 4 items → click 'Sair' → expect app exits cleanly with code 0",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e1-overlay-window",
+      "name": "Overlay window always-on-top no canto inferior direito",
+      "description": "Janela overlay separada (180x60px) com transparent:true, frame:false, alwaysOnTop:true, skipTaskbar:true, focusable:false. Posicionada no canto inferior direito da tela ativa.",
+      "acceptance_criteria": [
+        "Overlay window criado no boot com tamanho 180x60",
+        "Flags BrowserWindow: transparent=true, frame=false, alwaysOnTop=true, skipTaskbar=true, focusable=false",
+        "Posição: workArea.x + workArea.width - 180 - 16, workArea.y + workArea.height - 60 - 16",
+        "Overlay permanece visível por cima de qualquer app fullscreen (level='screen-saver')",
+        "Reposiciona automaticamente quando display ativo muda"
+      ],
+      "test_scenario": "launch app → query BrowserWindow list → expect overlay window with width=180 height=60 frame=false alwaysOnTop=true → check position is bottom-right of primary display workArea → open fullscreen app → screenshot → expect overlay still visible",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e1-hotkey-hold-release",
+      "name": "Hotkey global Right Ctrl hold/release via uIOhook",
+      "description": "Registra listener uIOhook para detectar Right Ctrl pressed (arma+grava mic) e released (encerra+dispara STT). Electron globalShortcut sozinho não detecta release; uIOhook supre essa lacuna.",
+      "acceptance_criteria": [
+        "uIOhook carregado on app boot sem crash",
+        "Press Right Ctrl emite IPC 'hotkey:armed' no main process",
+        "Release Right Ctrl emite IPC 'hotkey:released' no main process",
+        "Latência press→armed < 50ms (p95)",
+        "Hold de >300ms necessário para armar (anti-tap acidental)",
+        "Não interfere com uso normal de Right Ctrl em outros apps (passthrough)"
+      ],
+      "test_scenario": "launch app → simulate Right Ctrl keydown via uIOhook fake → wait 350ms → expect IPC 'hotkey:armed' emitted → simulate Right Ctrl keyup → expect IPC 'hotkey:released' emitted → measure latency on press → assert < 50ms",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e1-tray-menu-actions",
+      "name": "Tray menu com ações: Settings, Histórico, Mute, Quit",
+      "description": "Menu do tray icon expõe abertura das janelas auxiliares e toggle de mute global (pausa hotkey sem fechar app).",
+      "acceptance_criteria": [
+        "Click 'Settings' abre Settings window (cria se não existir; foca se já aberta)",
+        "Click 'Histórico' abre Histórico window com mesma regra",
+        "Toggle 'Mute' alterna settings.muted; quando muted=true, hotkey:armed é no-op",
+        "Quando muted=true, overlay idle ganha visual desabilitado (opacidade reduzida)",
+        "Click 'Sair' chama app.quit() encerrando tudo"
+      ],
+      "test_scenario": "launch app → click tray 'Settings' → expect settings window visible → close it → click tray 'Mute' → expect overlay opacity=0.4 → simulate Right Ctrl hold → expect no recording started",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell",
+        "e1-overlay-window",
+        "e1-hotkey-hold-release"
+      ]
+    },
+    {
+      "id": "e1-auto-start-windows",
+      "name": "Auto-start no boot do Windows (login items)",
+      "description": "Settings permite ativar/desativar abertura automática do flowtype no login do Windows via app.setLoginItemSettings.",
+      "acceptance_criteria": [
+        "Toggle 'Iniciar com o Windows' em Settings/Sobre",
+        "Quando ativado: app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })",
+        "Quando desativado: openAtLogin: false",
+        "Estado persiste em settings.auto_start e reflete app.getLoginItemSettings na próxima abertura",
+        "Quando app inicia com flag --hidden, pula splash e fica só com overlay+tray"
+      ],
+      "test_scenario": "open settings → toggle 'Iniciar com Windows' ON → check app.getLoginItemSettings().openAtLogin=true → reload settings → expect toggle still ON → toggle OFF → check openAtLogin=false",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e1-hot-corner-reveal",
+      "name": "Hot-corner reveal do overlay (mouse no canto = opaco)",
+      "description": "Quando mouse entra na área do canto inferior direito (200x80px), overlay ganha opacidade total e mostra estado completo. Sai do canto → volta a discreto.",
+      "acceptance_criteria": [
+        "Listener de mouse position global (uIOhook mousemove ou screen.getCursorScreenPoint poll)",
+        "Mouse dentro do retângulo (workArea.right-200, workArea.bottom-80, 200, 80) → overlay opacity=1.0",
+        "Mouse fora do retângulo por >300ms → overlay opacity volta ao default do estado (idle=0.3)",
+        "Transição animada 200ms (Framer Motion fade)",
+        "Não interfere com clicks: overlay continua focusable=false"
+      ],
+      "test_scenario": "launch app → screenshot overlay default → expect opacity=0.3 → move cursor to bottom-right corner via robot → wait 100ms → screenshot → expect opacity=1.0 → move cursor away → wait 400ms → screenshot → expect opacity=0.3",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-overlay-window"
+      ]
+    },
+    {
+      "id": "e2-groq-provider",
+      "name": "Groq STT provider pool-aware (Whisper Large v3 Turbo, multi-key)",
+      "description": "GroqProvider implementa SttProvider.transcribe usando um KeyPool injetado. Cada call escolhe a próxima key disponível via KeyPool.next(); registra consumo em token_usage. Bootstrap lê GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 do .env.",
+      "acceptance_criteria": [
+        "Construtor recebe KeyPool: GroqProvider(keyPool: GroqKeyPool)",
+        "transcribe(audio, lang?) chama keyPool.next() pra obter { apiKey, slotIndex, label } antes de cada request",
+        "POST multipart pra https://api.groq.com/openai/v1/audio/transcriptions com model=whisper-large-v3-turbo usando a key escolhida",
+        "Aceita audio webm/opus/m4a/wav diretamente",
+        "Latência p50 < 1000ms para áudio de 3s",
+        "Retorna { text, latencyMs, provider: \"groq\", slotIndex, slotLabel }",
+        "Erros: 401 → keyPool.markInvalid(slotIndex) + throw GroqAuthError; 429 → keyPool.markExhausted(slotIndex) + throw GroqRateLimitError; timeout 5s → throw GroqTimeoutError sem penalizar key",
+        "Bootstrap inicial: lê GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 e GROQ_API_KEY_LABEL_{1,2,3} do .env (.studio/local/flowtype-secrets.env em dev, %APPDATA%/flowtype/secrets.env em prod)"
+      ],
+      "test_scenario": "seed pool com 2 keys válidas → call groqProvider.transcribe(audio) 3x → expect rotation: slotIndex sequence inclui ambos slots → stub key#1 to 429 → call → expect pool.markExhausted(0) chamado, próxima call usa slot 1 → stub key#1 to 401 → expect pool.markInvalid(0) chamado",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell",
+        "e2-groq-key-pool"
+      ]
+    },
+    {
+      "id": "e2-groq-key-pool",
+      "name": "GroqKeyPool: primitiva multi-slot com estado por key",
+      "description": "Classe GroqKeyPool gerencia até 3 slots de keys Groq. Estado por slot: { apiKey, label, status: online|invalid|exhausted, usedToday, lastReset, daily_cap }. Reset diário em 00:00 UTC. Persiste estado em SQLite (token_usage).",
+      "acceptance_criteria": [
+        "Construtor: GroqKeyPool({ slots: GroqSlot[], repo: TokenUsageRepo })",
+        "next(): retorna { apiKey, slotIndex, label } do próximo slot online — round-robin pela ordem dos slots, pulando invalid/exhausted",
+        "markExhausted(slotIndex): muda status pra exhausted; só permite voltar a online no próximo reset diário",
+        "markInvalid(slotIndex): muda status pra invalid; persiste em settings.groq_slot_{N}_invalid_at; só limpa via re-validação manual em settings",
+        "incrementUsage(slotIndex, count=1): incrementa usedToday, persiste; auto-marca exhausted quando atinge daily_cap",
+        "allUnavailable(): true se todos slots não-online (invalid+exhausted)",
+        "resetDaily(): zera usedToday e limpa exhausted (mantém invalid); roda em cron 00:00 UTC + at app boot se lastReset > 24h",
+        "snapshot(): retorna { totalSlots, online, invalid, exhausted, totalUsedToday } pra dashboard/histórico"
+      ],
+      "test_scenario": "seed pool 3 slots → call next() 5x → expect rotation [0,1,2,0,1] → markExhausted(1) → call next() 3x → expect [0,2,0] (slot 1 skipped) → markInvalid(0) → call next() → expect slot=2 → markExhausted(2) → expect allUnavailable()===true → fake clock advance 24h → call resetDaily → expect slot 2 voltou (exhausted limpo), slot 0 ainda invalid",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-token-usage"
+      ]
+    },
+    {
+      "id": "e2-groq-pool-rotation",
+      "name": "Política de rotação round-robin entre Groq keys",
+      "description": "Política intra-Groq dentro do SttGateway: usa GroqKeyPool.next() pra distribuir carga uniformemente entre slots online; tenta próximo slot no mesmo turno em caso de 429/401; conta key_rotation_count na metadata da resposta.",
+      "acceptance_criteria": [
+        "Para cada transcribe(): tenta até N slots online (N = pool.onlineCount) no mesmo turno antes de cair pra local",
+        "Round-robin balanceado: distribui chamadas uniformemente — após M calls, |used[i] - used[j]| ≤ 1 para todos i,j online",
+        "Em 429 dentro do turno: marca exhausted aquele slot e tenta próximo IMEDIATAMENTE (não cai pra local ainda)",
+        "Em 401 dentro do turno: marca invalid aquele slot e tenta próximo IMEDIATAMENTE",
+        "Em GroqTimeoutError repetido (2x): NÃO marca exhausted (timeout pode ser rede); cai pra local com fell_back=true e attempts mostra ambos timeouts",
+        "key_rotation_count na metadata = quantas vezes trocou de slot dentro do turno (0 = first try OK)",
+        "Logs estruturados: { event: \"groq.rotation\", from_slot, to_slot, reason: \"429\"|\"401\"|\"timeout\" }"
+      ],
+      "test_scenario": "seed pool 3 slots online → stub slot#1 → 429, slot#2 → 401, slot#3 → ok → call → expect attempts=[{slot:0,err:\"429\"},{slot:1,err:\"401\"},{slot:2,ok}], provider_used=\"groq\", key_rotation_count=2, pool state: [exhausted, invalid, online] → assert distribuição uniforme: rodar 60 calls com 3 slots ok → expect cada slot recebeu 20±1",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-groq-key-pool",
+        "e2-stt-cascade-fallback"
+      ]
+    },
+    {
+      "id": "e2-groq-pool-config",
+      "name": "GroqPoolConfig: componente React de gestão dos 3 slots",
+      "description": "Componente isolado <GroqSlotManager /> reutilizado em Settings → STT e Onboarding. Renderiza os 3 slots fixos com state online/invalid/exhausted, formulário inline de cada (paste key + label + daily_cap), ações testar/remover, e estado consolidado do pool.",
+      "acceptance_criteria": [
+        "Componente recebe props: { pool: GroqKeyPool, onPoolChange: (newPool) => void }",
+        "Renderiza 3 cards horizontais (Slot #1, #2, #3) com estilo dark luxuoso",
+        "Slot vazio: ícone \"+\" grande, texto \"Adicionar key Groq\", botão expande pra form inline",
+        "Slot preenchido: campo password mascarado mostrando últimos 4 chars, label editável (text input), select daily_cap (presets: 14400/7200/3600/custom), badge status colorido, usage bar",
+        "Ações por slot: \"Testar\" (chama e2-groq-key-validation), \"Remover\" (com confirm modal)",
+        "Estado consolidado no topo: \"X de 3 slots ativos · Y / Z req disponíveis hoje\"",
+        "Empty state quando 0 slots: alert amarelo \"Sem keys Groq — só fallback local lento. Adicione 1 grátis em console.groq.com (deep-link)\"",
+        "Reutilizado em 2 lugares idênticos: Settings → STT (modo full) e Onboarding step 4 (modo compact apenas slot #1)"
+      ],
+      "test_scenario": "render <GroqSlotManager pool={empty} /> → expect 3 cards vazios + alert amarelo → click \"+\" no slot #1 → preenche form → save → expect badge verde + usage 0/14400 → click \"+\" slot #2 → cola key inválida → expect badge vermelho → click \"Testar\" slot #1 → expect \"OK · latência ~XXXms\" → click \"Remover\" slot #1 → expect confirm modal → confirma → expect slot volta a vazio",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-groq-key-pool",
+        "e2-groq-key-validation"
+      ]
+    },
+    {
+      "id": "e2-groq-key-validation",
+      "name": "Validação live de Groq key (GET /v1/models)",
+      "description": "Função validateGroqKey(apiKey) chama GET https://api.groq.com/openai/v1/models e retorna { valid, error?, latencyMs }. Usada ao adicionar key em Settings/Onboarding e ao clicar \"Testar\".",
+      "acceptance_criteria": [
+        "validateGroqKey(apiKey: string): Promise<{ valid: boolean, error?: string, latencyMs: number }>",
+        "GET https://api.groq.com/openai/v1/models com Authorization: Bearer ${apiKey}, timeout 3s",
+        "Resposta 200 + body inclui whisper-large-v3-turbo → valid=true",
+        "Resposta 401 → valid=false, error=\"Key inválida ou expirada\"",
+        "Resposta 429 → valid=true mas marca slot como exhausted (key ok, só sem cota agora)",
+        "Timeout 3s → valid=false, error=\"Timeout — verifique conexão\"",
+        "Network error → valid=false, error=\"Sem conexão com api.groq.com\"",
+        "Nunca persiste key inválida — caller decide o que fazer com error"
+      ],
+      "test_scenario": "mock GET /v1/models → 200 com whisper-large-v3-turbo na lista → call validateGroqKey(\"gsk_xxx\") → expect { valid:true, latencyMs:~XXX } → mock → 401 → call → expect { valid:false, error:/inválida/ } → mock → 429 → call → expect { valid:true } mas slot marcado exhausted no caller → mock → timeout 5s → call → expect rejeita após 3s com error=/Timeout/",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-groq-provider"
+      ]
+    },
+    {
+      "id": "e2-faster-whisper-local",
+      "name": "faster-whisper local provider (small.en bundled)",
+      "description": "Implementação FasterWhisperLocalProvider: spawn Python child process com faster-whisper small.en bundled. Funciona offline; fallback quando Groq falha.",
+      "acceptance_criteria": [
+        "Spawn Python child via spawn(python_bundled_path, [script.py, model_path='small.en'])",
+        "Comunicação via stdin (push audio bytes) / stdout (JSON transcript)",
+        "Child fica vivo entre chamadas (warm); restart automático se morrer",
+        "Modelo small.en (~140MB) bundled em resources/models/faster-whisper/",
+        "Latência p50 < 4s em CPU de 4 cores para áudio 3s",
+        "Retorna { text: string, latencyMs: number, provider: 'local' }"
+      ],
+      "test_scenario": "launch app → call localProvider.transcribe(audio_3s_en.opus) → expect text matches fixture transcription (WER < 0.2) → expect latencyMs < 4000 → call again → expect child reused (no spawn overhead) → kill child manually → next call should auto-restart",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e2-stt-cascade-fallback",
+      "name": "Cascade STT 2 níveis: rotação Groq keys → faster-whisper local",
+      "description": "SttGateway orquestra cascade em 2 níveis (espelha playspeak): (1) rotação round-robin entre keys Groq disponíveis; (2) fallback local quando TODAS as keys Groq estão exhausted/invalid OU offline. Settings force_local pula nível 1 inteiro.",
+      "acceptance_criteria": [
+        "Ordem default: rotação Groq pool → faster-whisper local (force_local=false)",
+        "Nível 1 (intra-Groq): KeyPool.next() escolhe round-robin entre keys com cota; em 429 marca exhausted e tenta próxima; em 401 marca invalid e tenta próxima",
+        "Nível 2 (fallback de provider): só dispara quando KeyPool.allUnavailable() === true OU GroqTimeoutError repetido em 2+ keys OU fetch offline",
+        "Ordem com force_local=true: pula Groq pool inteiro, vai direto local",
+        "Erros 401 são tratados por slot (marca aquele invalid) — só escalam pro user se TODAS as keys ficarem invalid",
+        "Resposta inclui metadata: { provider_used, fell_back, attempts: [{ slotIndex?, error? }], key_rotation_count }",
+        "Telemetria de fallback: emite tokens.recorded por slot consumido + log dashboard mostrando qual nível foi acionado"
+      ],
+      "test_scenario": "seed pool com 2 keys → stub key#1 → 429 → call sttGateway.transcribe → expect attempts=[{slot:0,err:\"429\"},{slot:1,ok}], provider_used=\"groq\", fell_back=false, key_rotation_count=1 → stub ambas keys → 429 → call → expect provider_used=\"local\", fell_back=true → set force_local=true → call → expect Groq pool NOT called",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-groq-provider",
+        "e2-groq-pool-rotation",
+        "e2-faster-whisper-local"
+      ]
+    },
+    {
+      "id": "e2-provider-badge-overlay",
+      "name": "Badge no overlay revelando key/provider usado (Groq #N ou local)",
+      "description": "Após STT, badge transitório (1.5s) mostra qual key Groq (#1/#2/#3 + label opcional) ou faster-whisper local foi usado. Ajuda owner a entender velocidade real e identificar key esgotada.",
+      "acceptance_criteria": [
+        "Após transcrição Groq: overlay mostra \"☁ Groq #N · <label>\" (label só se definido) por 1500ms",
+        "Após transcrição local: overlay mostra \"💻 local · faster-whisper\" por 1500ms",
+        "Badge inclui latencyMs em texto pequeno (ex.: \"☁ Groq #2 · 720ms\")",
+        "Fade-in 150ms, fade-out 300ms (Framer Motion)",
+        "Cores: nuvem azul claro com tom diferente por slot (1=azul, 2=ciano, 3=índigo), verde-âmbar (local)",
+        "Quando key marca-se exhausted dentro do cascade, badge mostra ícone de aviso pequeno no rodapé do histórico (não interrompe overlay)",
+        "Não aparece se transcrição vazia ou erro fatal"
+      ],
+      "test_scenario": "seed pool 2 keys (slot 0 label \"primary\") → trigger transcription → expect overlay badge \"☁ Groq #1 · primary · ~XXXms\" → stub slot 0 → 429 → trigger → expect badge \"☁ Groq #2 · ~XXXms\" (rotation OK) → force local → trigger → expect badge \"💻 local · faster-whisper · ~XXXms\"",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-stt-cascade-fallback",
+        "e1-overlay-window"
+      ]
+    },
+    {
+      "id": "e2-stt-settings-provider",
+      "name": "Settings STT: 3 slots Groq + cascade toggle + idioma",
+      "description": "Seção Settings/STT Provider: 3 slots de Groq key (Slot #1/#2/#3) com label, status badge (online/invalid/exhausted), usage do dia; toggle \"Forçar local sempre\"; dropdown idioma; botão \"testar transcrição\" inline com indicação de qual slot foi usado.",
+      "acceptance_criteria": [
+        "Exibe 3 slots Groq fixos (Slot #1, #2, #3). Slot vazio mostra botão \"+ Adicionar key Groq\" + deep-link console.groq.com",
+        "Slot preenchido mostra: campo mascarado (...últimos 4 chars), label editável, badge status (verde=online / vermelho=invalid / amarelo=exhausted hoje), usage=\"X / 14400 req hoje\", botões \"testar\" e \"remover\"",
+        "Toggle \"Forçar local sempre\" persiste settings.stt_force_local (bool)",
+        "Dropdown idioma persiste settings.stt_language (null = auto-detect; opções: pt-BR, en-US, es, fr, de, it)",
+        "Botão \"testar transcrição\": grava 3s, roda cascade, mostra \"Slot usado: #N · texto: ... · latência: XXXms\"",
+        "Save imediato: alterações em slots e toggles aplicam na próxima transcrição (sem botão Save)",
+        "Remover slot exige confirm (modal \"vai esvaziar este slot — continuar?\"); se for o único slot ativo, avisa \"você ficará sem Groq — só fallback local\""
+      ],
+      "test_scenario": "open settings → expect 3 slots com slot #1 preenchido (seed bootstrap) → click \"+ Adicionar key\" no slot #2 → cola key inválida → expect badge vermelho \"invalid\" → cola key válida → expect badge verde + usage 0/14400 → click \"testar\" → expect inline result \"Slot usado: #1 · ...\" → toggle \"Forçar local sempre\" ON → testar → expect \"Slot usado: local\"",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-stt-cascade-fallback",
+        "e2-groq-pool-config",
+        "e2-groq-key-validation"
+      ]
+    },
+    {
+      "id": "e2-stt-telemetry-timing",
+      "name": "Telemetria de latência STT por transcrição",
+      "description": "Cada transcrição registra latency_ms e provider_used em SQLite (transcription.latency_ms). Permite análise pós-uso e mostra na bolha do histórico.",
+      "acceptance_criteria": [
+        "Insert em transcription persiste latency_ms (number) e provider_used ('groq'|'local')",
+        "Marca de tempo: t0 = hotkey:released; t1 = STT.complete → latency = t1 - t0",
+        "Inclui duration_ms (duração do áudio capturado)",
+        "Item do histórico mostra latência + provider como meta linha",
+        "Latência média 7 dias visível em Settings/Sobre"
+      ],
+      "test_scenario": "trigger 3 transcriptions → query transcription table → expect 3 rows with latency_ms not null and provider_used in ('groq','local') → open Histórico → expect meta line shows '720ms · ☁ Groq' for first row",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-stt-cascade-fallback",
+        "e6-schema-transcription"
+      ]
+    },
+    {
+      "id": "e3-active-window-detect",
+      "name": "Detecção de janela ativa via PowerShell GetForegroundWindow",
+      "description": "Antes da injeção, captura handle da janela em foco + exe name + título via spawn de PowerShell rodando GetForegroundWindow API.",
+      "acceptance_criteria": [
+        "getActiveWindow() retorna { hwnd, exeName, windowTitle } usando PowerShell -NoProfile",
+        "Latência < 100ms p95",
+        "Suporta apps Win32, UWP e Electron (todos com hwnd válido)",
+        "Erro/timeout → retorna null (não bloqueia pipeline)",
+        "exeName normalizado lowercase (notepad.exe, claude.exe)"
+      ],
+      "test_scenario": "open Notepad and focus it → call getActiveWindow() → expect { exeName: 'notepad.exe', windowTitle contains 'Bloco' or 'Notepad' } → measure latency → assert < 100ms → close Notepad and focus desktop → call again → expect explorer.exe or null",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e3-clipboard-snapshot-restore",
+      "name": "Snapshot e restore do clipboard (text+html+image)",
+      "description": "Antes de escrever transcrição no clipboard, snapshot do conteúdo atual (text, html, image). Após paste, restore via timer 200ms.",
+      "acceptance_criteria": [
+        "snapshotClipboard() captura electron clipboard.readText(), readHTML(), readImage()",
+        "writeTranscript() salva snapshot, depois clipboard.writeText(novoTexto)",
+        "restoreClipboard() rescreve text/html/image conforme snapshot original",
+        "Restore acontece 200ms após paste (delay configurável)",
+        "Se clipboard original vazio, restore limpa o clipboard (writeText(''))",
+        "Preserva snapshot.image como nativeImage corretamente (não lossy)"
+      ],
+      "test_scenario": "copy texto 'original' to clipboard → call snapshotClipboard() → call writeTranscript('novo texto') → expect clipboard.readText()='novo texto' → wait 250ms restore → call restoreClipboard() → expect clipboard.readText()='original'",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e3-paste-ctrl-v",
+      "name": "Simulação de Ctrl+V via nut.js para colar transcrição",
+      "description": "Após writeTranscript, simula Ctrl+V no app em foco usando nut.js keyboard.pressKey. Sleep 80ms entre press/release pra garantir captura.",
+      "acceptance_criteria": [
+        "pasteIntoActiveWindow() chama nut-js keyboard.pressKey(Key.LeftControl, Key.V)",
+        "Sleep 80ms; depois keyboard.releaseKey",
+        "Mensagem é colada no app em foco com texto literal (não duplicado, não truncado)",
+        "Funciona em Notepad, Claude web, ChatGPT, WhatsApp Web, Slack, VSCode, CMD",
+        "Erros nut.js (binary não encontrado, permission denied) logados sem crash"
+      ],
+      "test_scenario": "open Notepad → focus it → call writeTranscript('teste de injecao') → call pasteIntoActiveWindow() → wait 200ms → use UI automation to read Notepad content → expect text contains 'teste de injecao'",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e3-clipboard-snapshot-restore",
+        "e3-active-window-detect"
+      ]
+    },
+    {
+      "id": "e3-refocus-target-window",
+      "name": "Re-foco da janela alvo antes do paste (anti perda de foco)",
+      "description": "Entre hotkey-released e paste, foco pode escapar (overlay flicker, settings modal). Antes de paste, re-foca hwnd alvo via PowerShell SetForegroundWindow.",
+      "acceptance_criteria": [
+        "Pipeline armazena hwnd no hotkey:armed (captura via e3-active-window-detect)",
+        "Antes de pasteIntoActiveWindow, chama refocusWindow(hwnd) via PowerShell SetForegroundWindow",
+        "Latência refocus < 80ms",
+        "Se hwnd inválido (janela fechada), aborta paste e mostra notificação 'janela perdida'",
+        "Logs incluem refocused: true/false por interação"
+      ],
+      "test_scenario": "focus Notepad → trigger hotkey:armed (hwnd captured) → click on desktop (perda foco) → trigger hotkey:released → expect refocusWindow called with Notepad hwnd → expect paste lands in Notepad (not desktop)",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e3-active-window-detect",
+        "e3-paste-ctrl-v"
+      ]
+    },
+    {
+      "id": "e3-typing-fallback",
+      "name": "Fallback typing simulado char-por-char para apps que bloqueiam paste",
+      "description": "Para apps em blacklist (campos de senha, alguns terminais), digita char-por-char via nut.js keyboard.type em vez de Ctrl+V.",
+      "acceptance_criteria": [
+        "Settings expõe lista 'apps que bloqueiam paste' com defaults (cmd.exe terminal de senha)",
+        "Quando exeName em blacklist OU paste detectado falhar (clipboard inalterado), faz typing simulado",
+        "Typing usa keyboard.type(texto) com delay 8ms entre chars",
+        "Latência aceitável: até 2s para texto de 200 chars",
+        "Caracteres especiais (acentos, ç) preservados corretamente"
+      ],
+      "test_scenario": "add 'fakepasswordapp.exe' to blacklist → focus that app → trigger transcription with 'senha123 áéíóú' → expect keyboard.type called (not Ctrl+V) → expect chars appear sequentially → verify final text matches input",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e3-paste-ctrl-v"
+      ]
+    },
+    {
+      "id": "e3-app-whitelist-blacklist",
+      "name": "Whitelist/blacklist de apps em Settings (editável por exeName)",
+      "description": "Settings expõe duas listas editáveis: blacklist (apps onde flowtype não injeta) e force-typing (apps que recebem typing em vez de paste). Edição inline.",
+      "acceptance_criteria": [
+        "Settings/Vocabulário Custom tem aba 'Apps' com 2 listas",
+        "Adicionar: digitar exeName ou clicar 'detectar app em foco agora' (captura via e3-active-window-detect)",
+        "Remover: ícone X em cada linha",
+        "Quando exeName em blacklist: hotkey transcreve mas não cola; mostra notificação 'app bloqueado'",
+        "Persiste em settings.app_blacklist e settings.app_force_typing (arrays de strings lowercase)"
+      ],
+      "test_scenario": "open settings/Apps → add 'notepad.exe' to blacklist → save → focus Notepad → trigger transcription → expect no paste happened, expect toast 'app bloqueado' → remove from blacklist → trigger again → expect paste works",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e3-paste-ctrl-v",
+        "e3-active-window-detect"
+      ]
+    },
+    {
+      "id": "e3-smart-punctuation",
+      "name": "Pontuação inteligente opcional (capitalize first + period at end)",
+      "description": "Toggle Settings/STT 'pontuação automática'. Quando ON: aplica heurística simples — primeira letra maiúscula, ponto final se ausente, espaço após pontuação.",
+      "acceptance_criteria": [
+        "Toggle settings.smart_punctuation persistido (default true)",
+        "Heurística: trim → capitalize first char → if last char não é .?!,; → append '.'",
+        "Aplica APÓS vocab corrections (e6-vocab-correction-pipeline)",
+        "Quando OFF: texto cru do provider sem modificação",
+        "Não duplica pontuação ('teste.' não vira 'teste..')"
+      ],
+      "test_scenario": "set smart_punctuation=true → feed transcript 'oi tudo bem' → expect output='Oi tudo bem.' → feed 'já tem ponto.' → expect 'Já tem ponto.' (no duplo ponto) → set smart_punctuation=false → feed 'oi' → expect 'oi'",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e3-paste-ctrl-v"
+      ]
+    },
+    {
+      "id": "e4-overlay-4-states",
+      "name": "Overlay 4 estados visuais (idle/armed/capturing/processing)",
+      "description": "Overlay renderiza 4 estados com Framer Motion: idle (dot 8px breathing), armed (pulse rápido brand), capturing (waveform reativa ao mic), processing (spinner + texto).",
+      "acceptance_criteria": [
+        "Estado idle: dot 8x8 com animação opacity 0.3↔0.6 a cada 2s",
+        "Estado armed: pulse brand color (escala 1↔1.4) a cada 600ms",
+        "Estado capturing: waveform 5 barras reativas ao volume via AnalyserNode (atualiza 30fps)",
+        "Estado processing: spinner rotativo + texto 'ouvindo...' fade-in",
+        "Transições entre estados < 200ms (sem flicker)",
+        "Estado controlado por IPC overlay:state mit valor enum"
+      ],
+      "test_scenario": "launch app → screenshot overlay → expect idle dot → emit IPC overlay:state='armed' → screenshot → expect pulse element visible → emit overlay:state='capturing' → screenshot → expect 5 waveform bars → emit overlay:state='processing' → screenshot → expect spinner",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-overlay-window"
+      ]
+    },
+    {
+      "id": "e4-settings-window-sections",
+      "name": "Settings window com 7 seções navegáveis (480px slim)",
+      "description": "Settings window (480x720) dark luxuoso com sidebar de 7 seções: Hotkey, Microfone, STT Provider, Idioma, Vocabulário Custom, Auto-start, Sobre.",
+      "acceptance_criteria": [
+        "Window 480x720 fixo, dark theme, sidebar à esquerda 140px",
+        "7 seções com ícone + label clicáveis na sidebar",
+        "Click muda main area sem recarregar window",
+        "Save autônomo (cada controle salva ao mudar; sem botão global)",
+        "Tecla Esc fecha settings"
+      ],
+      "test_scenario": "open settings → expect window 480x720 → expect 7 sidebar items → click each → expect main area changes content → press Esc → expect window closed",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e4-history-window-timeline",
+      "name": "Histórico window com timeline reversa, busca, filtro, ações",
+      "description": "Histórico window (640x720) com timeline cronológica reversa. Cada item: data, app destino, texto, mini player áudio, copy/edit/delete. Busca FTS5 e filtro por data/app.",
+      "acceptance_criteria": [
+        "Window 640x720 com lista virtual scrolling (suporta 10k+ rows)",
+        "Cada item mostra: timestamp humano ('há 2min'), app_exe + window_title, texto truncado 80 chars",
+        "Botão play reproduz audio_path (opus)",
+        "Botão copy → clipboard.writeText do texto",
+        "Botão edit abre modal inline (textarea) → save atualiza row",
+        "Botão delete confirma e remove row (e arquivo de áudio se existir)"
+      ],
+      "test_scenario": "seed 5 transcriptions in DB → open history → expect 5 rows in reverse chronological order → click play first → expect audio plays → click copy → check clipboard has the text → click edit → modify text → save → expect DB row updated",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-transcription",
+        "e6-fts5-search"
+      ]
+    },
+    {
+      "id": "e4-history-search-filters",
+      "name": "Busca FTS5 + filtros (data e app) no histórico",
+      "description": "Search bar no topo do histórico usa FTS5 transcription_fts. Filtros: range de data (hoje, 7d, 30d, custom) e multi-select por app_exe.",
+      "acceptance_criteria": [
+        "Search bar com debounce 250ms → query FTS5 MATCH",
+        "Resultados destacados (highlight do termo encontrado)",
+        "Filtro data: chips 'Hoje', '7 dias', '30 dias', 'Tudo'",
+        "Filtro app: dropdown multi-select com lista de apps distintos do histórico",
+        "Filtros combinados via AND",
+        "Mostra contador '15 resultados' no topo"
+      ],
+      "test_scenario": "seed 20 transcriptions (mix apps + datas) → open history → type 'reunião' in search → expect rows containing 'reunião' → check counter shows correct number → select filter app='notepad.exe' → expect only notepad rows shown",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-history-window-timeline",
+        "e6-fts5-search"
+      ]
+    },
+    {
+      "id": "e4-history-export",
+      "name": "Export do histórico em markdown e JSON",
+      "description": "Botão 'Exportar' no histórico abre menu com 2 opções: Markdown (lista formatada com data/app/texto) e JSON (dump completo do filtro atual).",
+      "acceptance_criteria": [
+        "Botão 'Exportar' no header do histórico abre menu Markdown/JSON",
+        "Markdown: frontmatter + lista bullet por item com timestamp em ISO + app + texto",
+        "JSON: array de objetos com todos campos da tabela transcription",
+        "Export respeita filtros aplicados (busca, data, app)",
+        "showSaveDialog do Electron pra escolher destino",
+        "Toast 'Exportado para X.md' ao concluir"
+      ],
+      "test_scenario": "seed 5 rows → filter to 3 → click 'Exportar' → choose Markdown → save → open file → expect 3 items in markdown format → repeat with JSON → expect 3 objects in array",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-history-window-timeline"
+      ]
+    },
+    {
+      "id": "e4-vocab-custom-list",
+      "name": "Vocabulário custom: lista editável de correções term_wrong→term_correct",
+      "description": "Settings/Vocabulário Custom: tabela com colunas (errado, certo, case-sensitive, scope global/per-app). Aplicada pós-transcrição antes da injeção.",
+      "acceptance_criteria": [
+        "Tabela editável com colunas term_wrong, term_correct, case_sensitive (toggle), scope (global ou exeName)",
+        "Adicionar linha vazia ao clicar '+ Adicionar'",
+        "Remover linha via ícone X",
+        "Persiste em tabela vocab_entry com timestamp updated_at",
+        "Edição inline; save autônomo ao perder foco",
+        "Validação: term_wrong e term_correct não vazios"
+      ],
+      "test_scenario": "open settings/Vocabulário → add row { wrong:'kunha', correct:'Cunha', case_sensitive:false, scope:'global' } → save → query vocab_entry → expect row exists → remove row → expect deleted",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-vocab"
+      ]
+    },
+    {
+      "id": "e4-vocab-correction-pipeline",
+      "name": "Pipeline de aplicação de vocab corrections pós-transcrição",
+      "description": "Após STT retornar texto, aplica correções de vocab_entry (global + per-app conforme exeName atual) antes da injeção. Case-sensitive respeitado.",
+      "acceptance_criteria": [
+        "applyVocabCorrections(text, exeName) lê vocab_entry where scope='global' or scope=exeName",
+        "Substituição por word-boundary regex (não vira 'macarão' em 'macarrônica')",
+        "case_sensitive=false usa flag /i; true respeita caixa",
+        "Aplicada ANTES de smart_punctuation",
+        "Metadata interaction.vocab_applied_count guardado"
+      ],
+      "test_scenario": "seed vocab { wrong:'kunha', correct:'Cunha' } → feed transcript 'kunha chegou cedo' → expect output='Cunha chegou cedo' → seed { wrong:'JS', correct:'JavaScript', case_sensitive:true } → feed 'eu uso js e JS' → expect 'eu uso js e JavaScript'",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-vocab-custom-list",
+        "e3-smart-punctuation"
+      ]
+    },
+    {
+      "id": "e4-dark-luxuoso-theme",
+      "name": "Tema dark luxuoso minimalista com a11y (contraste WCAG AA)",
+      "description": "Paleta dark luxuosa (preto profundo + accent brand + neutros graduais) aplicada consistente em overlay, settings, histórico. Keyboard nav, focus visible, screen reader pro histórico.",
+      "acceptance_criteria": [
+        "CSS variables documentadas: --bg, --bg-elev, --accent, --text, --text-muted, --border",
+        "Contraste WCAG AA mínimo em todos textos (verificado via axe-core)",
+        "Focus ring visível (outline 2px accent) em todos controles interativos",
+        "Tab order coerente em settings e histórico",
+        "Screen reader anuncia ações do histórico (botões play/copy/edit/delete com aria-label)",
+        "Tipografia: Inter UI"
+      ],
+      "test_scenario": "open settings + histórico → run axe-core scan → expect 0 critical violations → tab through all controls → expect visible focus ring on each → use screen reader (NVDA emulation) → expect button labels announced correctly",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-settings-window-sections",
+        "e4-history-window-timeline"
+      ]
+    },
+    {
+      "id": "e5-onboarding-step-welcome",
+      "name": "Onboarding passo 1: welcome + diferencial vs Wispr",
+      "description": "Primeiro passo do wizard first-run: tela boas-vindas com pitch curto, comparativo flowtype vs Wispr (3 bullets: free, sub-1s, fallback local), botão 'Próximo'.",
+      "acceptance_criteria": [
+        "Wizard só abre se settings.first_run_completed=false",
+        "Passo 1 mostra logo + h1 'Bem-vindo ao flowtype' + 3 bullets vs Wispr",
+        "Bullets: 'Sem limite de tokens (free)', 'Sub-1s via Groq cloud', 'Fallback local quando offline'",
+        "Botão 'Próximo' habilitado (sem validação)",
+        "Botão 'Pular onboarding' visível (mas com confirm modal antes)"
+      ],
+      "test_scenario": "remove settings.first_run_completed → launch app → expect wizard step 1 visible → expect 3 bullets present → click 'Próximo' → expect step 2 visible → reload (with first_run_completed=true) → expect wizard NOT shown",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e1-app-shell"
+      ]
+    },
+    {
+      "id": "e5-onboarding-step-mic",
+      "name": "Onboarding passo 2: permissão microfone + device select",
+      "description": "Solicita permissão de microfone via navigator.mediaDevices. Lista devices disponíveis, deixa selecionar default. Mostra meter de input ao vivo.",
+      "acceptance_criteria": [
+        "Chama navigator.mediaDevices.getUserMedia({audio:true}) ao entrar no passo",
+        "Lista enumerateDevices filtrada por kind='audioinput' em dropdown",
+        "Seleciona default na primeira vez (deviceId='default')",
+        "Mostra meter de volume animado (AnalyserNode → barra horizontal)",
+        "Botão 'Próximo' desabilitado até permissão concedida",
+        "Mensagem de erro se permissão negada com botão 'tentar novamente'"
+      ],
+      "test_scenario": "enter step 2 → expect getUserMedia called → grant permission → expect device dropdown populated → speak into mic → expect volume meter animates → select different device → expect settings.mic_device_id updated → click 'Próximo'",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e5-onboarding-step-welcome"
+      ]
+    },
+    {
+      "id": "e5-onboarding-step-hotkey",
+      "name": "Onboarding passo 3: calibração de hotkey",
+      "description": "Passo 3 mostra Right Ctrl como hotkey default. User pode trocar. Demonstração: 'Segure agora pra testar' → feedback visual confirma press/release detectados.",
+      "acceptance_criteria": [
+        "Card visual destacando 'Right Ctrl' como default + botão 'Mudar'",
+        "Click 'Mudar' captura próxima tecla pressionada (incluindo modificadores)",
+        "Área de teste: indicator visual reage live (armed↔released)",
+        "Detecção bem-sucedida = badge verde 'Funcionando!'",
+        "settings.hotkey_code persiste código da tecla escolhida",
+        "Botão 'Próximo' habilitado apenas após detecção verificada"
+      ],
+      "test_scenario": "enter step 3 → expect default 'Right Ctrl' shown → press+hold Right Ctrl → expect indicator turns green → release → expect badge 'Funcionando!' appears → click 'Mudar' → press F12 → expect new hotkey saved as F12 → reload settings → expect hotkey=F12",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e5-onboarding-step-mic",
+        "e1-hotkey-hold-release"
+      ]
+    },
+    {
+      "id": "e5-onboarding-step-mic-test",
+      "name": "Onboarding passo 4: teste real Groq + adicionar keys extras opcional",
+      "description": "Passo 4: grava 5s, transcreve via Groq pool, mostra resultado + slot usado + latência. Após sucesso, CTA opcional \"Adicionar mais 1-2 keys Groq pra triplicar quota (gratuito)\" abre <GroqSlotManager compact />.",
+      "acceptance_criteria": [
+        "Botão grande \"Gravar 5s e testar\" inicia captura",
+        "Após capture: envia pra Groq pool → mostra texto transcrito + \"slot usado: #N\" + \"latência: XXXms\"",
+        "Se nenhum slot Groq presente: card com deep-link https://console.groq.com + form inline pra colar primeira key (slot #1) + validação live (e2-groq-key-validation)",
+        "Se Groq falha por timeout/offline: oferece fallback faster-whisper com aviso \"vai usar local — mais lento (~3s)\"",
+        "Após sucesso de teste com slot #1: card secundário (collapsible default-fechado) \"Quer triplicar sua quota grátis? Adicione +1 ou +2 keys Groq (cada uma dá +14.4k req/dia)\" → expande pra <GroqSlotManager compact />",
+        "Botão \"Concluir\" marca settings.first_run_completed=true e fecha wizard — funciona com 1, 2 ou 3 slots configurados",
+        "Skip do passo 4 só permitido se slot #1 já estava preenchido por env bootstrap"
+      ],
+      "test_scenario": "enter step 4 com pool vazio → expect form paste key + deep-link → cola key válida → expect badge verde → click \"Gravar e testar\" → fala \"olá flowtype\" → expect texto + \"slot usado: #1\" + latência → expect card \"triplicar quota\" visível → expande → adiciona slot #2 → expect <GroqSlotManager> mostra 2 slots ok → click \"Concluir\" → expect wizard fecha + settings.first_run_completed=true → relaunch app → expect wizard NÃO aparece",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e5-onboarding-step-hotkey",
+        "e2-groq-provider",
+        "e2-groq-pool-config",
+        "e2-groq-key-validation"
+      ]
+    },
+    {
+      "id": "e6-schema-transcription",
+      "name": "Schema SQLite: tabela transcription + FTS5 virtual",
+      "description": "Tabela transcription (id ULID, ts, text, audio_path, app_exe, app_window_title, app_field_type, provider_used, latency_ms, duration_ms) com FTS5 virtual transcription_fts(text).",
+      "acceptance_criteria": [
+        "Migration cria tabela transcription com 10 colunas tipadas",
+        "id é TEXT PRIMARY KEY (ULID), ts é INTEGER (unix ms), text NOT NULL",
+        "audio_path TEXT opcional (caminho relativo a %APPDATA%/flowtype/recordings)",
+        "app_exe TEXT, app_window_title TEXT, app_field_type TEXT opcional",
+        "provider_used TEXT CHECK IN ('groq','local'), latency_ms INTEGER, duration_ms INTEGER",
+        "Cria índice idx_transcription_ts em ts DESC + cria FTS5 virtual transcription_fts(text) sincronizado via triggers"
+      ],
+      "test_scenario": "delete DB → launch app → expect DB created with transcription + transcription_fts → insert 3 rows → query SELECT FROM transcription → expect 3 rows → query SELECT FROM transcription_fts WHERE text MATCH 'teste' → expect matching rows",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e6-schema-vocab",
+      "name": "Schema SQLite: tabela vocab_entry",
+      "description": "Tabela vocab_entry (id, term_wrong, term_correct, case_sensitive, scope, created_at, updated_at) para correções pós-transcrição.",
+      "acceptance_criteria": [
+        "Migration cria tabela vocab_entry com 7 colunas",
+        "id TEXT PRIMARY KEY (ULID)",
+        "term_wrong TEXT NOT NULL, term_correct TEXT NOT NULL",
+        "case_sensitive INTEGER (0/1) default 0",
+        "scope TEXT default 'global' (ou um exeName)",
+        "created_at e updated_at INTEGER (unix ms), índice em scope"
+      ],
+      "test_scenario": "launch app → query sqlite_master → expect table vocab_entry → insert row { wrong:'kunha', correct:'Cunha' } → query → expect row returned with all fields populated",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e6-schema-settings",
+      "name": "Schema SQLite: tabela settings (key-value JSON)",
+      "description": "Tabela settings (key TEXT PK, value TEXT) armazenando configurações como JSON serializado. Helpers getSetting/setSetting com cache em memória.",
+      "acceptance_criteria": [
+        "Migration cria tabela settings(key TEXT PRIMARY KEY, value TEXT)",
+        "Helpers getSetting<T>(key, defaultValue): T e setSetting(key, value)",
+        "Value sempre JSON-serializado (suporta string, number, boolean, object, array)",
+        "Cache in-memory invalidado em setSetting",
+        "Defaults documentados em const SETTINGS_DEFAULTS"
+      ],
+      "test_scenario": "setSetting('stt_force_local', true) → getSetting('stt_force_local', false) → expect true → setSetting('app_blacklist', ['foo.exe', 'bar.exe']) → getSetting → expect array deepEqual",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e6-schema-token-usage",
+      "name": "Schema SQLite: tabela token_usage (consumo por slot Groq)",
+      "description": "Tabela token_usage rastreia uso diário por slot Groq pra reset/exhaustion. Espelha padrão multi-key do playspeak (token_usage por provider+key+dia). Lida pelo GroqKeyPool.snapshot() e CTAs do histórico.",
+      "acceptance_criteria": [
+        "Tabela token_usage(id TEXT PK ULID, provider TEXT NOT NULL, slot_index INTEGER, slot_label TEXT, day TEXT NOT NULL, requests_count INTEGER DEFAULT 0, last_used_at TEXT, marked_exhausted_at TEXT, marked_invalid_at TEXT)",
+        "UNIQUE(provider, slot_index, day) — uma linha por slot por dia",
+        "Index em (provider, day) pra snapshot rápido",
+        "Day em formato YYYY-MM-DD UTC (alinha com reset diário 00:00 UTC)",
+        "TokenUsageRepo: increment(provider, slotIndex, label?, count=1), snapshot(provider, day), markExhausted(provider, slotIndex, day), markInvalid(provider, slotIndex)",
+        "Cleanup: linhas com day < hoje - 90 dias são apagadas em job mensal (manter histórico recente pra dashboard)"
+      ],
+      "test_scenario": "aplica migration → expect tabela token_usage criada com schema correto → call repo.increment(\"groq\", 0, \"primary\") → expect linha (provider=groq, slot=0, day=today, requests=1) → call increment 5x mesmo slot → expect requests_count=6 → call snapshot(\"groq\", today) → expect array com slot 0 com 6 requests → call markExhausted(\"groq\", 0, today) → expect marked_exhausted_at preenchido",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-migrations-versioned"
+      ]
+    },
+    {
+      "id": "e6-audio-storage-path",
+      "name": "Armazenamento de áudios em %APPDATA%/flowtype/recordings/YYYY-MM-DD",
+      "description": "Cada áudio capturado é salvo como .opus em %APPDATA%/flowtype/recordings/YYYY-MM-DD/<ulid>.opus. Caminho relativo armazenado em transcription.audio_path.",
+      "acceptance_criteria": [
+        "Diretório criado on-demand: app.getPath('appData')/flowtype/recordings/YYYY-MM-DD/",
+        "Nome do arquivo: <ULID>.opus (mesmo ULID da row transcription)",
+        "audio_path em transcription é relativo (YYYY-MM-DD/<ulid>.opus)",
+        "Helper resolveAudioFullPath(relative) retorna absoluto",
+        "Sweep opcional configurável: remover áudios > 30 dias (settings.audio_retention_days)"
+      ],
+      "test_scenario": "trigger transcription → expect file in %APPDATA%/flowtype/recordings/2026-05-25/<ulid>.opus → query transcription → expect audio_path matches relative pattern → call resolveAudioFullPath → expect existing file path",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-transcription"
+      ]
+    },
+    {
+      "id": "e6-fts5-search",
+      "name": "Busca FTS5 com triggers de sync transcription→transcription_fts",
+      "description": "Triggers AFTER INSERT/UPDATE/DELETE em transcription sincronizam transcription_fts. searchTranscriptions(query, filters) retorna rows ordenadas por rank.",
+      "acceptance_criteria": [
+        "Triggers AFTER INSERT, UPDATE OF text, DELETE replicam em transcription_fts",
+        "searchTranscriptions(query: string, filters?: { dateFrom, dateTo, appExe }) usa MATCH",
+        "Resultado ordenado por bm25(transcription_fts) ASC",
+        "Suporta operadores FTS5 (frase 'foo bar', prefix foo*, NEAR/N)",
+        "Filtros adicionais aplicados via WHERE join"
+      ],
+      "test_scenario": "insert 5 rows including 'reunião marcada' and 'reunião cancelada' → searchTranscriptions('reunião') → expect both rows → update one row text → expect FTS reflects change → delete row → expect FTS row removed",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-transcription"
+      ]
+    },
+    {
+      "id": "e6-repos-types",
+      "name": "Repos tipados: TranscriptionRepo, VocabRepo, SettingsRepo",
+      "description": "Wrappers tipados sobre better-sqlite3 para cada tabela. Interfaces TypeScript expostas para uso em UI e pipelines.",
+      "acceptance_criteria": [
+        "TranscriptionRepo { insert, update, delete, list, search, getById }",
+        "VocabRepo { insert, update, delete, listByScope, getGlobalAndAppScoped(exeName) }",
+        "SettingsRepo { get<T>, set<T>, reset, getAll }",
+        "Tipos TypeScript exportados para Transcription, VocabEntry, Setting",
+        "Erros propagados como typed errors (NotFoundError, ValidationError)"
+      ],
+      "test_scenario": "import TranscriptionRepo → call insert({text:'oi'}) → expect ULID retornado → call getById(id) → expect row → call delete(id) → call getById → expect NotFoundError thrown",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e6-schema-transcription",
+        "e6-schema-vocab",
+        "e6-schema-settings"
+      ]
+    },
+    {
+      "id": "e6-migrations-versioned",
+      "name": "Migrations versionadas (umzug-style simples)",
+      "description": "Sistema de migrations numeradas (001_initial.ts, 002_add_field.ts) executadas em ordem. Tabela schema_migrations rastreia aplicadas.",
+      "acceptance_criteria": [
+        "Pasta migrations/ com arquivos prefixados (001_, 002_, ...)",
+        "Cada migration exporta up(db: Database) e opcionalmente down(db)",
+        "Tabela schema_migrations(name TEXT PK, applied_at INTEGER)",
+        "Runner executa migrations não aplicadas em ordem alfabética",
+        "Migration falha → rollback transação + erro logado, app aborta boot com mensagem clara"
+      ],
+      "test_scenario": "delete DB → launch app → expect all migrations run → check schema_migrations table → expect rows for 001_initial → restart app → expect no migrations re-run → add buggy migration 999 → launch → expect app aborts with clear error",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e7-site-hero-cta",
+      "name": "Site landing hero com h1 + CTA download (Astro)",
+      "description": "Hero section: h1 'sua voz vira texto onde você estiver', subtítulo curto, botão CTA primário 'Download para Windows' linkando .exe. Dark theme matching app.",
+      "acceptance_criteria": [
+        "h1 single line, font display, contrast WCAG AAA",
+        "Subtítulo 1-2 frases sobre velocidade + free",
+        "CTA primário 'Download para Windows' visível above-the-fold",
+        "CTA secundário 'Ver como funciona' rola pra seção Como Funciona",
+        "Background com sutil gradient ou particle subtle (dark luxuoso)",
+        "Renderiza em < 1.5s LCP em 3G simulado"
+      ],
+      "test_scenario": "visit / → expect h1 visible → expect CTA 'Download para Windows' with href ending in .exe → click → expect download initiated → run Lighthouse → expect LCP < 1500ms",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-how-it-works",
+      "name": "Site seção 'Como Funciona' com 3 passos + micro-vídeos/gifs",
+      "description": "Seção explicando fluxo em 3 passos: 1) segure hotkey 2) fale 3) texto aparece. Cada passo com micro-vídeo loop (mp4 mute autoplay) ou gif curto.",
+      "acceptance_criteria": [
+        "3 cards lado a lado (desktop) ou stack vertical (mobile)",
+        "Cada card: ícone + número + título + descrição curta + mini-vídeo loop",
+        "Vídeos mp4 < 500KB cada, autoplay muted loop playsinline",
+        "Fallback img estático se prefers-reduced-motion=true",
+        "Lazy-load vídeos (loading=lazy ou IntersectionObserver)"
+      ],
+      "test_scenario": "visit / → scroll to 'Como Funciona' → expect 3 cards visible → check video tags have autoplay muted loop → set prefers-reduced-motion → reload → expect img static fallback shown instead",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-compare-table",
+      "name": "Site table comparativa vs Wispr Flow",
+      "description": "Tabela visual comparando flowtype vs Wispr em 6+ critérios (preço, limites, STT, privacy, vocab, plataforma). Checkmarks/X coloridos.",
+      "acceptance_criteria": [
+        "Tabela com 3 colunas (critério, Wispr, flowtype) e ≥6 linhas",
+        "Critérios: Preço, Limite de tokens, STT, Privacy fallback, Vocab custom, Open source",
+        "Ícone check verde para flowtype, X amarelo para Wispr quando aplicável",
+        "Mobile: stack vertical com cards por critério",
+        "Sticky header da tabela em scroll desktop"
+      ],
+      "test_scenario": "visit / → scroll to seção comparativa → expect table with 3 columns and ≥6 rows → check first row 'Preço' shows Wispr='Pago' flowtype='Free' → resize to 375px width → expect table re-flows to vertical cards",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-features-grid",
+      "name": "Site features grid (10 cards de features)",
+      "description": "Grid responsivo com 10 cards destacando features (hotkey global, sub-1s, fallback local, vocab custom, histórico FTS5, overlay 4 estados, etc). Ícone + título + descrição curta.",
+      "acceptance_criteria": [
+        "Grid CSS 4 colunas desktop / 2 mobile / 1 < 480px",
+        "10 cards mínimo cobrindo features principais",
+        "Cada card: ícone SVG (24px) + título + 1-2 frases",
+        "Hover desktop: leve scale + shadow accent",
+        "Acessível: cards são <article> com h3, contraste OK"
+      ],
+      "test_scenario": "visit / → scroll to features grid → expect ≥10 cards rendered → check grid is 4-column on 1440px viewport → resize to 768px → expect 2 columns → resize to 375px → expect 1 column",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-screenshots",
+      "name": "Site seção screenshots (overlay, settings, histórico)",
+      "description": "Seção visual com screenshots reais do app (overlay 4 estados em montagem, settings window, histórico timeline). Lightbox click pra zoom.",
+      "acceptance_criteria": [
+        "Mínimo 3 screenshots: overlay (montagem 4 estados), settings, histórico",
+        "Imagens WebP otimizadas < 200KB cada",
+        "Click abre lightbox modal full-size com close (Esc ou X)",
+        "Lazy-load (loading=lazy)",
+        "Mobile: carousel horizontal scrollável"
+      ],
+      "test_scenario": "visit / → scroll to screenshots section → expect ≥3 images → click first → expect lightbox modal visible with full image → press Esc → expect lightbox closed → on mobile viewport → expect horizontal carousel scrollable",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-download-section",
+      "name": "Site seção download com .exe + checksum + requisitos",
+      "description": "Card de download destacado: botão grande .exe Windows, checksum SHA256 copyable, frase 'requires Windows 10+', size do instalador.",
+      "acceptance_criteria": [
+        "Botão 'Baixar flowtype para Windows' linkando flowtype-setup-vX.Y.Z.exe",
+        "Mostra tamanho do arquivo (ex.: '180 MB')",
+        "Linha 'SHA256: abc123...' com botão copy clipboard",
+        "Linha 'Requer Windows 10 ou superior'",
+        "Link secundário .zip portable",
+        "Sem auto-download; user clica explicitamente"
+      ],
+      "test_scenario": "visit / → scroll to download → click 'Baixar para Windows' → expect download started for .exe file → verify checksum link copies SHA256 string to clipboard → check 'requires Windows 10+' text visible",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-faq",
+      "name": "Site FAQ com 10 perguntas accordion",
+      "description": "Seção FAQ com 10 perguntas comuns (privacy, Groq free?, requisitos, code signing, multi-OS, etc) em accordion expand/collapse.",
+      "acceptance_criteria": [
+        "10 perguntas mínimo cobrindo: privacy/local, Groq free, requisitos hardware, SmartScreen warning, Mac/Linux roadmap, Vocab custom, offline, código fonte, telemetry, suporte",
+        "Accordion <details><summary> nativo (acessível por padrão)",
+        "Apenas 1 aberto por vez (JS toggle close-others) ou múltiplos abertos (opção)",
+        "Mobile: ocupa largura total",
+        "Estrutura schema.org/FAQPage para SEO"
+      ],
+      "test_scenario": "visit / → scroll to FAQ → expect ≥10 questions rendered → click first question → expect answer expanded → click second → expect first closed, second opened → inspect HTML → expect schema.org FAQPage JSON-LD",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-site-footer",
+      "name": "Site footer com links (GitHub, contato, privacy)",
+      "description": "Footer dark com 3 colunas: produto (download, features, FAQ), recursos (GitHub, changelog), contato (email, twitter). Copyright + ano.",
+      "acceptance_criteria": [
+        "Footer com 3 colunas desktop / stack mobile",
+        "Coluna 1 (Produto): Download, Features, FAQ",
+        "Coluna 2 (Recursos): GitHub link, Changelog, Privacy Policy",
+        "Coluna 3 (Contato): Email mailto, social",
+        "Linha bottom: © 2026 flowtype + 'Made for human voice'",
+        "Contraste WCAG AA"
+      ],
+      "test_scenario": "visit / → scroll to footer → expect 3 columns desktop → check GitHub link present → resize to mobile → expect columns stack vertically → expect copyright with year 2026",
+      "viewport_targets": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "e7-deploy-cf-pages-versioning",
+      "name": "Deploy Cloudflare Pages com asset versioning ?v=COMMIT_SHA",
+      "description": "Site deploya em CF Pages via push GitHub (auto) ou Wrangler. CSS/JS bundles servidos com query ?v=<commit-sha> pra cache busting agressivo.",
+      "acceptance_criteria": [
+        "wrangler.toml ou config GitHub Action configurado",
+        "Build Astro produz dist/ pronta pra CF Pages",
+        "Cada asset CSS/JS referenciado com ?v=COMMIT_SHA",
+        "Headers _headers configura Cache-Control: max-age=31536000 imutáveis em assets versionados",
+        "Headers _headers configura Cache-Control: no-cache em index.html",
+        "Domínio configurável (flowtype.app ou subdomain)"
+      ],
+      "test_scenario": "push to main → expect CF Pages deploy triggered → visit deployed URL → view source → expect CSS href has ?v=<sha> → check response headers for CSS → expect immutable cache-control → check headers for / → expect no-cache",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e8-electron-builder-nsis-portable",
+      "name": "Build electron-builder: NSIS .exe + portable .zip",
+      "description": "Configuração electron-builder produz flowtype-setup-x.y.z.exe (NSIS, perMachine:false, allowToChangeInstallationDirectory:true) e flowtype-portable-x.y.z.zip.",
+      "acceptance_criteria": [
+        "npm run build:win produz ambos artefatos em dist/ sem erro",
+        "NSIS installer: perMachine=false, allowToChangeInstallationDirectory=true, oneClick=false",
+        "Default install: %LOCALAPPDATA%/Programs/flowtype",
+        "Portable .zip rodável extraído (sem install)",
+        "Sem code signing v0.1 (SmartScreen warning aceitável)",
+        "Versão de build lida de package.json"
+      ],
+      "test_scenario": "run npm run build:win → expect dist/flowtype-setup-X.Y.Z.exe and dist/flowtype-portable-X.Y.Z.zip exist → run installer in clean Windows VM → expect wizard → install → expect app in %LOCALAPPDATA%/Programs/flowtype → extract portable zip → run flowtype.exe → expect app launches",
+      "viewport_targets": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "e8-bundle-natives-and-model",
+      "name": "Bundle native binaries (faster-whisper + ffmpeg + uIOhook + model)",
+      "description": "Build inclui faster-whisper Python binary + small.en model (~140MB), ffmpeg-static, uIOhook native. Path helpers resolvem em app.asar.unpacked em produção.",
+      "acceptance_criteria": [
+        "electron-builder asarUnpack inclui resources/binaries e resources/models",
+        "Faster-whisper Python binary + small.en model presentes em dist/resources/",
+        "ffmpeg-static binary presente",
+        "uIOhook native bindings presentes",
+        "Path helper getBinaryPath(name) e getModelPath(name) funcionam em prod (app.asar.unpacked)",
+        "Tamanho total do instalador < 300MB"
+      ],
+      "test_scenario": "run npm run build:win → list dist/resources/ → expect faster-whisper binary + small.en model + ffmpeg + uIOhook present → install app → trigger STT in installed app forced local → expect local provider runs from bundled binary (no spawn error) → check installer size < 300MB",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e8-electron-builder-nsis-portable"
+      ]
+    },
+    {
+      "id": "e8-e2e-cascade-paste-notepad",
+      "name": "E2E: hotkey + Groq cloud + paste em Notepad",
+      "description": "Cenário Playwright-electron: launch app, abre Notepad, foca, segura Right Ctrl 2s falando, solta, espera, lê conteúdo Notepad via UI automation.",
+      "acceptance_criteria": [
+        "Playwright-electron launch app + spawn Notepad",
+        "Foca Notepad via UI automation (SetForegroundWindow)",
+        "Simula Right Ctrl hold 2s injetando audio fixture via virtual mic",
+        "Solta Right Ctrl → espera STT completar (timeout 5s)",
+        "Lê conteúdo do Notepad via UI automation → assert contém transcrição esperada",
+        "Verifica latência total hotkey→texto < 1.5s (Groq)"
+      ],
+      "test_scenario": "playwright-electron launch → spawn notepad.exe → focus it → uIOhook fake Right Ctrl down → feed audio fixture 'isso é um teste' to virtual mic → wait 2s → uIOhook fake Right Ctrl up → wait for paste (max 5s) → read notepad content → expect contains 'isso é um teste' → measure end-to-end < 1500ms",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e2-stt-cascade-fallback",
+        "e3-paste-ctrl-v"
+      ]
+    },
+    {
+      "id": "e8-e2e-offline-local-fallback",
+      "name": "E2E: hotkey + offline forçado + local fallback + paste",
+      "description": "Cenário com Groq stubbed to fail (force offline). Pipeline cai pra faster-whisper local. Paste em Notepad com badge 'local'.",
+      "acceptance_criteria": [
+        "Stub network: bloquear requests pra api.groq.com",
+        "Pipeline detecta fail → faster-whisper local roda",
+        "Paste em Notepad ocorre",
+        "Overlay badge mostra 'local' (não cloud)",
+        "Latência aceitável < 5s",
+        "Transcription row tem provider_used='local'"
+      ],
+      "test_scenario": "playwright-electron launch → block api.groq.com via network interception → focus notepad → trigger hotkey + audio → wait paste → expect notepad content matches → query transcription → expect provider_used='local' → screenshot overlay → expect 'local' badge visible",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e8-e2e-cascade-paste-notepad",
+        "e2-faster-whisper-local"
+      ]
+    },
+    {
+      "id": "e8-e2e-vocab-correction",
+      "name": "E2E: vocab custom corrige 'kunha→Cunha' on-the-fly",
+      "description": "Seed vocab_entry com correção. Trigger transcrição contendo 'kunha'. Verifica texto colado contém 'Cunha'.",
+      "acceptance_criteria": [
+        "Pre-seed vocab_entry { wrong:'kunha', correct:'Cunha', scope:'global' }",
+        "Audio fixture pronunciando 'kunha chegou cedo'",
+        "Pipeline transcreve → aplica vocab → paste em Notepad",
+        "Notepad recebe 'Cunha chegou cedo' (não 'kunha')",
+        "Transcription row registra vocab_applied_count >= 1"
+      ],
+      "test_scenario": "playwright-electron launch → seed vocab_entry kunha→Cunha → spawn notepad + focus → trigger hotkey + audio fixture 'kunha chegou cedo' → wait paste → read notepad → expect content='Cunha chegou cedo' → query transcription latest → expect vocab_applied_count >= 1",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-vocab-correction-pipeline",
+        "e8-e2e-cascade-paste-notepad"
+      ]
+    },
+    {
+      "id": "e8-e2e-overlay-4-states-screenshots",
+      "name": "E2E: overlay 4 estados com screenshot por estado",
+      "description": "Captura screenshot do overlay em cada um dos 4 estados (idle, armed, capturing, processing) via IPC injection. Verifica diff visual mínimo entre estados.",
+      "acceptance_criteria": [
+        "Para cada estado: emit IPC overlay:state → wait 200ms → screenshot overlay window",
+        "4 screenshots salvos em .studio/missions/MIS-0024/qa/screenshots/overlay-<state>.png",
+        "Diff visual entre estados > 5% pixels (não são todos iguais)",
+        "Cada screenshot mostra elemento esperado (dot, pulse, waveform, spinner)",
+        "Tamanho de cada screenshot ≈ 180x60"
+      ],
+      "test_scenario": "playwright-electron launch → for each state in ['idle','armed','capturing','processing'] → emit ipc('overlay:state', state) → wait 200ms → capture overlay screenshot → save → compare pixel diff between pairs → expect >5% diff between any 2 → verify expected element visible per state",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-overlay-4-states"
+      ]
+    },
+    {
+      "id": "e8-e2e-history-replay-edit-copy",
+      "name": "E2E: histórico replay áudio + edit + copy",
+      "description": "Abre Histórico window com seed de 3 transcriptions. Clica play (verifica áudio reproduz), edit (modifica texto, salva), copy (verifica clipboard).",
+      "acceptance_criteria": [
+        "Seed 3 transcriptions com audio_path apontando pra fixtures opus",
+        "Click play primeiro → expect <audio> element playing (currentTime > 0 após 500ms)",
+        "Click edit segundo → expect textarea visible → modifica texto → save → expect DB updated",
+        "Click copy terceiro → expect clipboard.readText() equals text da row",
+        "Click delete terceiro → confirma → expect row removed from DB"
+      ],
+      "test_scenario": "playwright-electron launch → seed 3 transcription rows with fixture audio → open history window → click play on row 1 → wait 600ms → expect audio.currentTime > 0 → click edit row 2 → fill textarea 'editado' → save → query DB row 2 → expect text='editado' → click copy row 3 → expect clipboard content = row 3 text",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e4-history-window-timeline"
+      ]
+    },
+    {
+      "id": "e8-e2e-onboarding-first-run",
+      "name": "E2E: onboarding completo first-run (4 passos)",
+      "description": "Remove settings.first_run_completed, lança app, percorre os 4 passos do wizard (welcome, mic, hotkey, mic-test), conclui, verifica settings.first_run_completed=true.",
+      "acceptance_criteria": [
+        "Pre-condição: settings.first_run_completed=false",
+        "Launch app → wizard step 1 visible → click Próximo",
+        "Step 2: grant mic permission via stub → select device → click Próximo",
+        "Step 3: simulate Right Ctrl press → wait green badge → click Próximo",
+        "Step 4: click 'Gravar e testar' → expect transcribed text → click Concluir",
+        "Verifica settings.first_run_completed=true e wizard fechado"
+      ],
+      "test_scenario": "playwright-electron launch with settings.first_run_completed=false → expect wizard step1 visible → click 'Próximo' → step2: stub getUserMedia grant → click 'Próximo' → step3: uIOhook fake Right Ctrl press/release → expect 'Funcionando!' → click 'Próximo' → step4: stub Groq success → click 'Gravar e testar' → wait result → click 'Concluir' → expect wizard closed → query settings → expect first_run_completed=true",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e5-onboarding-step-welcome",
+        "e5-onboarding-step-mic",
+        "e5-onboarding-step-hotkey",
+        "e5-onboarding-step-mic-test"
+      ]
+    },
+    {
+      "id": "e8-smoke-7-apps",
+      "name": "Smoke manual em 7 apps reais (Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, Slack, CMD)",
+      "description": "Checklist manual de smoke: instala app via NSIS, abre cada um dos 7 apps, testa hotkey+paste, registra resultado em planilha.",
+      "acceptance_criteria": [
+        "Lista de 7 apps testáveis documentada: Claude desktop, ChatGPT web, Notepad, WhatsApp Web, VSCode, Slack desktop, CMD Prompt",
+        "Para cada app: instalar/abrir → focar campo de input → trigger hotkey + falar 1 frase → verificar texto aparece corretamente",
+        "Resultado registrado em planilha .studio/missions/MIS-0024/qa/smoke-results.md (app | OK/falha | notas)",
+        "Mínimo 6/7 apps OK pra release (CMD pode falhar — fallback typing)",
+        "Apps que falharem entram no documento de limitações conhecidas"
+      ],
+      "test_scenario": "manual: install flowtype via NSIS → for each app in [Claude, ChatGPT web, Notepad, WhatsApp Web, VSCode, Slack, CMD] → open and focus input field → hold Right Ctrl + say 'teste de gravação' → release → verify text appears in field correctly → fill row in smoke-results.md → final: ≥6 OK to pass",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e8-electron-builder-nsis-portable",
+        "e8-bundle-natives-and-model"
+      ]
+    },
+    {
+      "id": "e8-perf-gate-p50",
+      "name": "Performance gate: p50 hotkey→texto inserido < 1.5s com Groq",
+      "description": "Script de benchmark dispara 20 transcrições com Groq, mede latência total hotkey:released → paste completo. Assert p50 < 1500ms.",
+      "acceptance_criteria": [
+        "Script bench/perf-p50.ts dispara 20 ciclos automatizados",
+        "Cada ciclo mede t_released, t_stt_done, t_paste_done",
+        "Computa p50, p90, p95 do tempo total released→paste_done",
+        "Assert p50 < 1500ms (gate de release)",
+        "Output em .studio/missions/MIS-0024/qa/perf-report.md com breakdown por etapa",
+        "Falha do gate gera alerta pra QA + bloqueia release"
+      ],
+      "test_scenario": "run npm run perf:p50 → expect 20 cycles executed → expect perf-report.md generated → parse report → assert p50 < 1500ms → if pass: write QA approval entry; if fail: write blocker note with slowest step identified",
+      "viewport_targets": [
+        "desktop"
+      ],
+      "dependencies": [
+        "e8-e2e-cascade-paste-notepad"
+      ]
+    }
+  ]
+}

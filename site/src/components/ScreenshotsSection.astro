@@ -1,0 +1,67 @@
+---
+const shots = [
+  {
+    src: "/screenshots/overlay-idle.png",
+    label: "Overlay no estado idle — ponto discreto no canto, opacidade 0.3.",
+    caption: "Idle — invisível até você falar",
+  },
+  {
+    src: "/screenshots/overlay-armed.png",
+    label: "Overlay armed — pulse cyan rápido indicando hotkey segurada.",
+    caption: "Armed — Right Ctrl segurada",
+  },
+  {
+    src: "/screenshots/overlay-capturing.png",
+    label: "Overlay capturing — waveform live reativa ao volume do mic.",
+    caption: "Capturing — waveform reativa",
+  },
+  {
+    src: "/screenshots/overlay-processing.png",
+    label: "Overlay processing — spinner cyan + texto 'transcrevendo…'.",
+    caption: "Processing — sub-1s p50",
+  },
+];
+---
+
+<section id="screenshots" class="scroll-mt-24" aria-labelledby="shots-h2">
+  <div class="max-w-6xl mx-auto px-6 py-16 sm:py-20">
+    <div class="text-center mb-10">
+      <h2 id="shots-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">
+        O overlay em ação
+      </h2>
+      <p class="text-sm text-muted mt-3">
+        4 estados visuais. Always-on-top, slim (200×64px), nunca rouba foco.
+      </p>
+    </div>
+
+    <!-- Desktop grid + Mobile horizontal scroll carousel -->
+    <div
+      class="md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 flex md:flex-none gap-3 overflow-x-auto md:overflow-visible snap-x snap-mandatory md:snap-none pb-3 md:pb-0 -mx-6 md:mx-0 px-6 md:px-0"
+      role="list"
+    >
+      {
+        shots.map((s) => (
+          <figure
+            role="listitem"
+            class="surface-card overflow-hidden snap-start flex-shrink-0 w-[78%] md:w-auto transition-all hover:border-accent/40"
+          >
+            <div class="aspect-[5/3] bg-bg-0 flex items-center justify-center overflow-hidden">
+              <img
+                src={s.src}
+                alt={s.label}
+                loading="lazy"
+                decoding="async"
+                width="600"
+                height="360"
+                class="w-full h-full object-contain"
+              />
+            </div>
+            <figcaption class="px-4 py-3 text-xs text-fg-soft font-mono border-t border-border">
+              {s.caption}
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </div>
+</section>

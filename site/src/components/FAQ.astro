@@ -1,0 +1,116 @@
+---
+import Icon from "./icons/Icon.astro";
+
+const faqs = [
+  {
+    q: "É grátis mesmo? Onde está o catch?",
+    a: "Sim, 100% free e sem limite de uso. Nenhum cartão, nenhuma assinatura, nenhum trial. A transcrição roda via Groq Whisper Large v3 Turbo (free tier) ou via faster-whisper local quando offline. Você cadastra uma key gratuita em <a class='text-accent hover:underline' href='https://console.groq.com' target='_blank' rel='noopener'>console.groq.com</a> no onboarding (5 minutos, sem cartão).",
+  },
+  {
+    q: "Como funciona o fallback offline?",
+    a: "O instalador inclui o modelo <code class='font-mono text-accent'>faster-whisper small.en</code> (~140 MB). Quando você está sem internet, ou quando ativa 'Forçar local sempre' nas Settings, a transcrição roda 100% no seu CPU. É mais lento (~3s vs sub-1s), mas funciona em avião, café sem Wi-Fi, ou pra áudio sensível que nunca pode sair da máquina.",
+  },
+  {
+    q: "Roda no Mac ou Linux?",
+    a: "Não ainda. v0.1 é Windows-only (Windows 10 e 11). Mac e Linux estão no roadmap — o stack Electron + Whisper + nut.js teoricamente porta direto, mas o hotkey global e o paste universal precisam de uma rodada de testes por plataforma. Se você quer macOS ou Linux, abre uma issue no GitHub votando.",
+  },
+  {
+    q: "Funciona em qualquer app mesmo?",
+    a: "Sim — qualquer campo de texto que aceita Ctrl+V. Testado em Claude, ChatGPT, Notepad, WhatsApp Web, Slack, VSCode, Cursor, terminais, browsers, campos de email, formulários. A injeção usa o pattern padrão do Windows (clipboard + paste simulado), então tudo que aceita colar normalmente aceita o Flow Type.",
+  },
+  {
+    q: "É open source?",
+    a: "Sim, MIT license. Código completo em <a class='text-accent hover:underline' href='https://github.com/flowtypeapp/flowtype' target='_blank' rel='noopener'>github.com/flowtypeapp/flowtype</a> (placeholder — repo final será publicado no release WO-8). Audite, modifique, fork — só não revenda como SaaS proprietário, por favor.",
+  },
+  {
+    q: "Posso usar 100% offline / sem mandar áudio pra cloud?",
+    a: "Sim. Settings → STT Provider → toggle 'Forçar local sempre'. Quando ativo, a transcrição cloud é pulada e o áudio nunca sai da sua máquina — roda no faster-whisper local (small.en). Latência fica em torno de 3s em CPU de 4 cores.",
+  },
+  {
+    q: "Onde meus áudios e transcrições ficam salvos?",
+    a: "Tudo em <code class='font-mono text-accent'>%APPDATA%/flowtype/</code>. Áudios em <code class='font-mono'>recordings/YYYY-MM-DD/&lt;ulid&gt;.opus</code>, transcrições em <code class='font-mono'>flowtype.db</code> (SQLite com FTS5). Nada sincroniza, nada sobe pra cloud. Você pode definir retenção (ex.: deletar áudios > 30 dias) nas Settings.",
+  },
+  {
+    q: "Como funciona o vocabulário custom?",
+    a: "Settings → Vocabulário Custom. Você lista pares <code class='font-mono'>term_wrong → term_correct</code> (ex.: <em>kunha → Cunha</em>, <em>JS → JavaScript</em>). Aplicado pós-transcrição via regex word-boundary, antes do paste. Scope pode ser 'global' (todo app) ou específico por exe (ex.: só em <code class='font-mono'>claude.exe</code>). Case-sensitive opcional por entrada.",
+  },
+  {
+    q: "O Windows SmartScreen vai bloquear?",
+    a: "Provavelmente sim na primeira execução, porque o instalador v0.1 não é code-signed (assinar com EV cert custa ~$500/ano, e a gente prefere manter free). Clique <strong>Mais informações → Executar mesmo assim</strong>. Conforme o número de downloads cresce, a Microsoft reduz o warning automaticamente. Ou, se preferir, use o .zip portable: extrai e roda direto, sem instalador.",
+  },
+];
+---
+
+<section id="faq" class="scroll-mt-24" aria-labelledby="faq-h2">
+  <div class="max-w-3xl mx-auto px-6 py-16 sm:py-20">
+    <div class="text-center mb-10">
+      <h2 id="faq-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">
+        Perguntas frequentes
+      </h2>
+      <p class="text-sm text-muted mt-3">Tudo que perguntaram na primeira semana.</p>
+    </div>
+
+    <div class="flex flex-col gap-2" data-faq-root>
+      {
+        faqs.map((f) => (
+          <details
+            class="group surface-card overflow-hidden transition-colors hover:border-accent/30"
+            data-faq-item
+          >
+            <summary
+              class="px-5 py-4 flex items-center justify-between gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+            >
+              <span class="text-sm sm:text-base font-medium text-fg group-hover:text-accent transition-colors">
+                {f.q}
+              </span>
+              <span class="text-muted group-open:rotate-180 transition-transform flex-shrink-0">
+                <Icon name="chevron-down" size={18} />
+              </span>
+            </summary>
+            <div
+              class="px-5 pb-5 pt-0 text-sm text-fg-soft leading-relaxed"
+              set:html={f.a}
+            />
+          </details>
+        ))
+      }
+    </div>
+  </div>
+
+  <!-- JSON-LD para SEO: FAQPage -->
+  <script
+    type="application/ld+json"
+    set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: faqs.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          // strip HTML pro JSON-LD (mantém texto limpo)
+          text: f.a.replace(/<[^>]+>/g, ""),
+        },
+      })),
+    })}
+  />
+</section>
+
+<script is:inline>
+  // Accordion behavior: só 1 aberto por vez. JS opcional — sem ele, todos abrem livres.
+  document.addEventListener("DOMContentLoaded", () => {
+    const root = document.querySelector("[data-faq-root]");
+    if (!root) return;
+    const items = Array.from(root.querySelectorAll("[data-faq-item]"));
+    items.forEach((item) => {
+      item.addEventListener("toggle", () => {
+        if (!(item instanceof HTMLDetailsElement) || !item.open) return;
+        items.forEach((other) => {
+          if (other !== item && other instanceof HTMLDetailsElement && other.open) {
+            other.open = false;
+          }
+        });
+      });
+    });
+  });
+</script>

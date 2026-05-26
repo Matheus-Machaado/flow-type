@@ -1,0 +1,107 @@
+---
+import Icon from "./icons/Icon.astro";
+
+const version = "v0.1.0";
+const exeFile = `flowtype-setup-${version}.exe`;
+const portableFile = `flowtype-portable-${version}.exe`;
+// SHA-256 do build v0.1.0 (gerado 2026-05-26 via PowerShell Get-FileHash).
+const sha256 =
+  "56fda783b2b64abaf26dcfbf4d9e11bb740b831c121dafa25bc6ada886ec01e9";
+const sizeMb = "83 MB";
+const downloadUrlExe = `/download/${exeFile}`;
+const downloadUrlZip = `/download/${portableFile}`;
+const checksumUrl = "/download/checksums.txt";
+---
+
+<section id="download" class="scroll-mt-24" aria-labelledby="dl-h2">
+  <div class="max-w-3xl mx-auto px-6 py-16 sm:py-20">
+    <div
+      class="rounded-2xl bg-gradient-to-br from-bg-2 to-bg-1 border border-accent/30 p-6 sm:p-10 text-center shadow-overlay"
+    >
+      <div
+        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/30 text-[10px] font-mono text-accent mb-5"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-hidden="true"></span>
+        {version} · disponível agora
+      </div>
+
+      <h2 id="dl-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">
+        Baixar Flow Type
+      </h2>
+      <p class="text-sm text-fg-soft mt-3 max-w-md mx-auto leading-relaxed">
+        Instalador NSIS (.exe) ou .zip portable. Sem code signing nessa primeira versão —
+        Windows pode mostrar SmartScreen na primeira execução (clique <strong>Mais informações
+        → Executar mesmo assim</strong>).
+      </p>
+
+      <a
+        href={downloadUrlExe}
+        class="inline-flex items-center gap-3 mt-6 px-6 sm:px-8 py-4 rounded-xl bg-accent text-bg-0 hover:bg-accent-2 transition-colors text-sm font-semibold shadow-glowStrong"
+        download
+      >
+        <Icon name="download" size={20} />
+        <span class="hidden sm:inline">{exeFile}</span>
+        <span class="sm:hidden">Baixar para Windows</span>
+        <span class="text-[10px] opacity-70 font-mono">{sizeMb}</span>
+      </a>
+
+      <div class="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted">
+        <a
+          href={downloadUrlZip}
+          class="hover:text-accent transition-colors inline-flex items-center gap-1.5"
+          download
+        >
+          <Icon name="download" size={12} />
+          .zip portable
+        </a>
+        <span class="text-faint" aria-hidden="true">·</span>
+        <a
+          href={checksumUrl}
+          class="hover:text-accent transition-colors inline-flex items-center gap-1.5"
+        >
+          checksums.txt
+        </a>
+        <span class="text-faint" aria-hidden="true">·</span>
+        <button
+          type="button"
+          data-sha={sha256}
+          class="copy-sha hover:text-accent transition-colors inline-flex items-center gap-1.5 font-mono"
+          aria-label={`Copiar checksum SHA-256: ${sha256}`}
+        >
+          <Icon name="copy" size={12} />
+          <span class="sha-label">SHA-256</span>
+        </button>
+      </div>
+
+      <p class="text-[11px] text-faint font-mono mt-5">
+        Requer Windows 10 ou superior · 200 MB livre em disco
+      </p>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // Copy SHA-256 button. Mantido inline pra zero overhead e funcionar sem hidratação.
+  document.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest(".copy-sha");
+    if (!btn) return;
+    const sha = btn.getAttribute("data-sha");
+    if (!sha) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(sha)
+        .then(() => {
+          const label = btn.querySelector(".sha-label");
+          if (!label) return;
+          const original = label.textContent;
+          label.textContent = "Copiado ✓";
+          setTimeout(() => {
+            label.textContent = original;
+          }, 1500);
+        })
+        .catch(() => {});
+    }
+  });
+</script>

@@ -1,0 +1,29 @@
+{
+  "name": "flowtype-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "flowtype marketing site (Astro + Tailwind, deployed to Cloudflare Pages)",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "start": "astro dev --host 127.0.0.1 --port 4321",
+    "build": "astro build && node scripts/inject-version.mjs",
+    "preview": "astro preview --host 127.0.0.1 --port 4321",
+    "astro": "astro",
+    "lighthouse": "lhci autorun --collect.url=http://127.0.0.1:4321 || true"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.2.1",
+    "@astrojs/tailwind": "^5.1.4",
+    "@fontsource-variable/inter": "^5.1.1",
+    "@fontsource-variable/jetbrains-mono": "^5.1.2",
+    "astro": "^5.1.5",
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

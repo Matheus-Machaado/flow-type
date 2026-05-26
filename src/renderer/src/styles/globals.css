@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #e8ecef;
+    background: #060708;
+  }
+  /* Focus visible: cyan ring on all interactive elements */
+  *:focus-visible {
+    outline: 2px solid transparent;
+  }
+  /* Better keyboard nav for buttons/anchors */
+  button,
+  [role='button'],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  code,
+  pre,
+  kbd {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
+/* ── Custom scrollbar (subtle, dark) ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #060708;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f242c;
+  border-radius: 6px;
+  border: 2px solid #060708;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2c333d;
+}
+
+/* ── Reduced motion guardrail (a11y) ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Overlay-specific ─────────────────────────────────────────────── */
+.overlay-root {
+  background: transparent;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ── Selection (cyan tint) ────────────────────────────────────────── */
+::selection {
+  background: rgba(95, 230, 255, 0.25);
+  color: #e8ecef;
+}

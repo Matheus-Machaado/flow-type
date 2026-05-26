@@ -1,0 +1,76 @@
+---
+const steps = [
+  {
+    n: "01",
+    meta: "300ms anti-tap",
+    title: "Segure Right Ctrl",
+    body: "Overlay no canto da tela pulsa cyan. Mic está ativo, gravando.",
+    visual: "armed",
+  },
+  {
+    n: "02",
+    meta: "capturing 30fps",
+    title: "Fale naturalmente",
+    body: "Waveform live reage ao seu volume. Suporta PT, EN, ES, FR, DE, IT.",
+    visual: "wave",
+  },
+  {
+    n: "03",
+    meta: "p50 720ms",
+    title: "Solte e cole",
+    body: "Solta a tecla. Sub-1s depois, texto aparece no campo ativo do app em foco.",
+    visual: "text",
+  },
+];
+---
+
+<section id="how-it-works" class="scroll-mt-24" aria-labelledby="how-h2">
+  <div class="max-w-6xl mx-auto px-6 py-16 sm:py-20">
+    <div class="text-center mb-10 sm:mb-12">
+      <h2 id="how-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">Como funciona</h2>
+      <p class="text-sm text-muted mt-3">3 passos. Sem mouse, sem menu, sem fricção.</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4 sm:gap-5">
+      {
+        steps.map((step) => (
+          <article class="surface-card p-6 group transition-all hover:border-accent/40 hover:shadow-glow">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="w-9 h-9 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent text-xs font-mono font-semibold">
+                {step.n}
+              </span>
+              <span class="text-xs text-muted font-mono">{step.meta}</span>
+            </div>
+            <h3 class="text-lg font-semibold tracking-tight text-fg">{step.title}</h3>
+            <p class="text-sm text-fg-soft mt-2 leading-relaxed">{step.body}</p>
+
+            <div class="mt-5 h-28 rounded-lg bg-bg-0 border border-border flex items-center justify-center">
+              {step.visual === "armed" && (
+                <span
+                  class="w-3 h-3 rounded-full bg-accent animate-armed-pulse"
+                  aria-hidden="true"
+                />
+              )}
+              {step.visual === "wave" && (
+                <div class="flex items-end gap-1 h-10" aria-hidden="true">
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                  <span class="wavebar w-1" />
+                </div>
+              )}
+              {step.visual === "text" && (
+                <span class="text-xs text-accent-2 font-mono px-4 text-center">
+                  "sua voz virou texto. ✓"
+                </span>
+              )}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>

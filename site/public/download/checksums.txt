@@ -1,0 +1,2 @@
+56fda783b2b64abaf26dcfbf4d9e11bb740b831c121dafa25bc6ada886ec01e9  flowtype-setup-v0.1.0.exe
+9ae7014da700f2f231352bf720dea9aa0d16f5cc9be257a007df071677c9fe80  flowtype-portable-v0.1.0.exe

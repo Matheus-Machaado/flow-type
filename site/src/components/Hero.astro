@@ -1,0 +1,79 @@
+---
+import Icon from "./icons/Icon.astro";
+---
+
+<section class="relative overflow-hidden" aria-labelledby="hero-h1">
+  <!-- glow radial background -->
+  <div
+    class="pointer-events-none absolute inset-0 -z-10 bg-hero-radial"
+    aria-hidden="true"
+  ></div>
+
+  <div class="max-w-5xl mx-auto px-6 pt-16 pb-12 sm:pt-20 sm:pb-16 text-center">
+    <div
+      class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-bg-2 border border-accent/30 text-[11px] font-mono text-accent mb-6 animate-fade-in-up"
+    >
+      <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" aria-hidden="true"></span>
+      <span>v0.1 · Windows · 100% free</span>
+    </div>
+
+    <h1
+      id="hero-h1"
+      class="text-display font-bold tracking-tight leading-[1.05] animate-fade-in-up"
+      style="animation-delay: 80ms"
+    >
+      sua voz vira texto<br />
+      <span class="flow-gradient bg-clip-text text-transparent">onde você estiver</span>
+    </h1>
+
+    <p
+      class="text-base sm:text-lg text-fg-soft mt-6 max-w-2xl mx-auto leading-relaxed animate-fade-in-up"
+      style="animation-delay: 160ms"
+    >
+      Segure <kbd>Right Ctrl</kbd>, fale, solta. Em menos de 1 segundo o texto aparece no
+      campo ativo — Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, qualquer app.
+    </p>
+
+    <div
+      class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up"
+      style="animation-delay: 240ms"
+    >
+      <a
+        href="#download"
+        class="px-6 py-3 text-sm font-semibold rounded-lg bg-accent text-bg-0 hover:bg-accent-2 transition-colors shadow-glowStrong inline-flex items-center gap-2"
+      >
+        <Icon name="download" size={16} />
+        <span>Baixar para Windows</span>
+        <span class="text-[10px] opacity-70 font-mono">v0.1.0 · 180 MB</span>
+      </a>
+      <a
+        href="#how-it-works"
+        class="px-6 py-3 text-sm font-semibold rounded-lg bg-bg-2 border border-border text-fg-soft hover:border-accent/40 hover:text-accent transition-colors inline-flex items-center gap-2"
+      >
+        Ver como funciona
+        <Icon name="chevron-down" size={14} />
+      </a>
+    </div>
+
+    <!-- demo strip — voz virando texto -->
+    <div
+      class="mt-12 inline-flex flex-wrap items-center gap-4 px-6 py-4 rounded-xl bg-bg-2 border border-border shadow-overlay animate-fade-in-up"
+      style="animation-delay: 320ms"
+      role="img"
+      aria-label="Demonstração: 5 barras de áudio capturando, seguidas pelo texto transcrito 'Bora reescrever o módulo de auth pra usar JWT stateless.'"
+    >
+      <div class="flex items-end gap-[3px] h-7" aria-hidden="true">
+        <span class="wavebar h-4"></span>
+        <span class="wavebar h-6"></span>
+        <span class="wavebar h-3"></span>
+        <span class="wavebar h-7"></span>
+        <span class="wavebar h-5"></span>
+      </div>
+      <span class="text-xs text-fg-soft font-mono">capturando…</span>
+      <span class="text-[10px] text-muted" aria-hidden="true">→</span>
+      <span class="text-xs text-accent text-left max-w-md">
+        "Bora reescrever o módulo de auth pra usar JWT stateless."
+      </span>
+    </div>
+  </div>
+</section>

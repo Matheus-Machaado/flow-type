@@ -1,0 +1,15 @@
+# Wrangler config para Cloudflare Pages.
+# Necessário só para deploy via CLI (`wrangler pages deploy`).
+# Para deploy auto via Git, basta conectar o repo no dashboard CF Pages e usar:
+#   Build command:    npm run build
+#   Build output:     dist
+#   Root directory:   projects/flowtype/site
+#   Node version:     20
+
+name = "flowtype"
+compatibility_date = "2026-05-01"
+pages_build_output_dir = "./dist"
+
+[vars]
+# Variáveis disponibilizadas no build/runtime (CF Pages preenche CF_PAGES_COMMIT_SHA automaticamente).
+SITE_VERSION = "v0.1.0"

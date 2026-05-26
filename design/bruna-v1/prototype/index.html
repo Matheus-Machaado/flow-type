@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>flowtype — protótipo Bruna v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg0:        '#060708',
+        bg1:        '#0c0e11',
+        bg2:        '#14171c',
+        surface:    '#1a1e25',
+        surfacehi:  '#232830',
+        accent:     '#5FE6FF',
+        accent2:    '#B8FFEE',
+        accentdeep: '#1A8FA8',
+        slot1:      '#5FE6FF',
+        slot2:      '#7DD3FC',
+        slot3:      '#A5B4FC',
+        slotlocal:  '#FBBF24',
+        fg:         '#E8ECEF',
+        fgsoft:     '#B5BCC4',
+        muted:      '#7C8590',
+        faint:      '#4A525C',
+        success:    '#34D399',
+        warning:    '#FBBF24',
+        danger:     '#F87171',
+        border:     '#1f242c',
+        borderstrong:'#2c333d',
+      },
+      fontFamily: {
+        sans:    ['Inter', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'monospace'],
+      },
+      boxShadow: {
+        overlay: '0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(95,230,255,0.08)',
+        glow:    '0 0 24px rgba(95,230,255,0.18)',
+        glowStrong: '0 0 36px rgba(95,230,255,0.35)',
+      }
+    }
+  }
+}
+</script>
+<style>
+  html, body { background: #030405; min-height: 100vh; }
+  body { font-family: 'Inter', sans-serif; color: #E8ECEF; -webkit-font-smoothing: antialiased; }
+
+  /* ── overlay state animations ───────────────────────── */
+  @keyframes idle-breath {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50%      { opacity: 0.65; transform: scale(1.1); }
+  }
+  .anim-idle { animation: idle-breath 2s ease-in-out infinite; }
+
+  @keyframes pulse-armed {
+    0%   { box-shadow: 0 0 0 0 rgba(95, 230, 255, 0.6), 0 0 28px 0 rgba(95, 230, 255, 0.2); transform: scale(1); }
+    70%  { box-shadow: 0 0 0 14px rgba(95, 230, 255, 0), 0 0 56px 12px rgba(95, 230, 255, 0.0); transform: scale(1.35); }
+    100% { box-shadow: 0 0 0 0 rgba(95, 230, 255, 0); transform: scale(1); }
+  }
+  .anim-armed { animation: pulse-armed 0.9s ease-out infinite; }
+
+  @keyframes waveform {
+    0%, 100% { height: 4px; }
+    20%      { height: 22px; }
+    40%      { height: 12px; }
+    60%      { height: 28px; }
+    80%      { height: 8px; }
+  }
+  .wavebar { width: 3px; background: #5FE6FF; border-radius: 2px; animation: waveform 0.9s ease-in-out infinite; box-shadow: 0 0 6px rgba(95,230,255,0.4); }
+  .wavebar:nth-child(2) { animation-delay: 0.10s; }
+  .wavebar:nth-child(3) { animation-delay: 0.25s; }
+  .wavebar:nth-child(4) { animation-delay: 0.15s; }
+  .wavebar:nth-child(5) { animation-delay: 0.05s; }
+  .wavebar:nth-child(6) { animation-delay: 0.20s; }
+  .wavebar:nth-child(7) { animation-delay: 0.12s; }
+
+  @keyframes spin360 { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  .anim-spin { animation: spin360 0.9s linear infinite; }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .anim-in { animation: fadeInUp 240ms ease-out backwards; }
+
+  @keyframes badgeFlash {
+    0%   { opacity: 0; transform: translateY(-4px); }
+    15%  { opacity: 1; transform: translateY(0); }
+    85%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .anim-badge { animation: badgeFlash 1.8s ease-out infinite; }
+
+  @keyframes flowPulse {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  .flow-gradient {
+    background: linear-gradient(90deg, #5FE6FF 0%, #B8FFEE 50%, #5FE6FF 100%);
+    background-size: 200% 100%;
+    animation: flowPulse 3.5s ease-in-out infinite;
+  }
+
+  /* ── overlay window mock ────────────────────────────── */
+  .overlay-card {
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(26,30,37,0.95) 0%, rgba(12,14,17,0.95) 100%);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(95,230,255,0.12);
+  }
+
+  /* ── scrollbar dark ─────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2c333d; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4A525C; }
+
+  /* ── desktop wallpaper bg (overlay context) ─────────── */
+  .desktop-bg {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(95,230,255,0.06) 0%, transparent 45%),
+      radial-gradient(circle at 75% 65%, rgba(165,180,252,0.05) 0%, transparent 45%),
+      linear-gradient(135deg, #07090c 0%, #030405 100%);
+  }
+
+  /* ── slot badge dots ────────────────────────────────── */
+  .dot-online   { background: #34D399; box-shadow: 0 0 8px rgba(52,211,153,0.6); }
+  .dot-invalid  { background: #F87171; box-shadow: 0 0 8px rgba(248,113,113,0.5); }
+  .dot-exhaust  { background: #FBBF24; box-shadow: 0 0 8px rgba(251,191,36,0.5); }
+
+  /* ── view system ────────────────────────────────────── */
+  .view { display: none; }
+  .view.active { display: block; }
+  .nav-btn.active { background: #1a1e25; color: #5FE6FF; }
+
+  /* ── wizard step transitions ────────────────────────── */
+  .wizard-step { display: none; }
+  .wizard-step.active { display: block; }
+  .wizard-dot { width: 8px; height: 8px; border-radius: 50%; background: #2c333d; transition: all 240ms; }
+  .wizard-dot.active { background: #5FE6FF; box-shadow: 0 0 8px rgba(95,230,255,0.6); width: 28px; border-radius: 4px; }
+  .wizard-dot.done { background: #1A8FA8; }
+
+  /* ── focus ring ─────────────────────────────────────── */
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid #5FE6FF;
+    outline-offset: 2px;
+  }
+
+  /* ── range / volume meter ───────────────────────────── */
+  .meter-fill { background: linear-gradient(90deg, #5FE6FF 0%, #B8FFEE 100%); }
+
+  /* ── histórico item hover ──────────────────────────── */
+  .hist-item { transition: background 160ms; }
+  .hist-item:hover { background: #1a1e25; }
+
+  /* ── site marketing ─────────────────────────────────── */
+  .site-bg {
+    background:
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(95,230,255,0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #060708 0%, #0c0e11 100%);
+  }
+
+  .feature-card { transition: transform 200ms, box-shadow 200ms, border-color 200ms; }
+  .feature-card:hover { transform: translateY(-2px); border-color: rgba(95,230,255,0.3); box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(95,230,255,0.12); }
+
+  /* small subtle grid pattern for overlay backdrop demo */
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(95,230,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(95,230,255,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+</style>
+</head>
+<body class="bg-bg0">
+
+<!-- ====================================================== -->
+<!-- NAV TOP                                                -->
+<!-- ====================================================== -->
+<div class="sticky top-0 z-50 bg-bg0/95 backdrop-blur-md border-b border-border">
+  <div class="max-w-[1280px] mx-auto px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0 font-bold shadow-glow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold leading-none tracking-tight">flowtype</h1>
+        <p class="text-[10px] text-muted leading-tight font-mono">protótipo · Bruna v1 · MIS-0024</p>
+      </div>
+    </div>
+    <nav class="flex flex-wrap gap-1 text-xs">
+      <button onclick="showView('overlay-idle')"    class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2 active">Overlay · idle</button>
+      <button onclick="showView('overlay-armed')"   class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Overlay · armed</button>
+      <button onclick="showView('overlay-capturing')" class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Overlay · capturing</button>
+      <button onclick="showView('overlay-processing')" class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Overlay · processing</button>
+      <button onclick="showView('settings')"         class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Settings (STT)</button>
+      <button onclick="showView('history')"          class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Histórico</button>
+      <button onclick="showView('onboarding')"       class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Onboarding</button>
+      <button onclick="showView('site')"             class="nav-btn px-2.5 py-1.5 rounded-md text-fgsoft hover:bg-bg2">Site landing</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: OVERLAY IDLE                                     -->
+<!-- ====================================================== -->
+<div id="view-overlay-idle" class="view active">
+  <div class="desktop-bg min-h-[640px] relative grid-pattern">
+    <!-- caption -->
+    <div class="absolute top-6 left-6 max-w-md anim-in">
+      <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-bg2 border border-border text-muted">
+        <span class="w-1.5 h-1.5 rounded-full bg-accent shadow-glow"></span>
+        Estado · idle
+      </span>
+      <h2 class="text-2xl font-semibold mt-3">Presença discreta no canto</h2>
+      <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+        Overlay 200×64 always-on-top no canto inferior direito. Dot 8px com leve breathing (opacity 0.3↔0.6, 2s).
+        Hot-corner reveal: mouse no canto → opacidade total + label.
+      </p>
+      <div class="mt-4 flex items-center gap-3 text-xs text-muted">
+        <span class="font-mono">Right Ctrl</span>
+        <span class="text-faint">·</span>
+        <span>segure para gravar</span>
+      </div>
+    </div>
+
+    <!-- mock janela alvo (Notepad-like) -->
+    <div class="absolute top-20 right-12 w-[520px] h-[280px] bg-bg2 border border-border rounded-lg shadow-2xl overflow-hidden anim-in" style="animation-delay:80ms">
+      <div class="h-7 bg-surface flex items-center justify-between px-3 border-b border-border">
+        <span class="text-[11px] text-muted font-mono">📝 notepad.exe — Sem título</span>
+        <div class="flex gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+        </div>
+      </div>
+      <div class="p-4 font-mono text-xs text-fgsoft">
+        <span class="text-muted">// cursor aguardando</span><br/>
+        <span class="inline-block w-1.5 h-3.5 bg-accent ml-0 animate-pulse"></span>
+      </div>
+    </div>
+
+    <!-- overlay slim -->
+    <div class="absolute bottom-6 right-6 anim-in" style="animation-delay:160ms">
+      <div class="overlay-card w-[200px] h-[64px] flex items-center px-4 shadow-overlay">
+        <div class="flex items-center gap-3 w-full">
+          <span class="w-2 h-2 rounded-full bg-fgsoft anim-idle"></span>
+          <span class="text-[11px] text-muted font-mono tracking-wide">aguardando</span>
+          <span class="ml-auto text-[10px] text-faint font-mono">⌃ Right</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: OVERLAY ARMED                                    -->
+<!-- ====================================================== -->
+<div id="view-overlay-armed" class="view">
+  <div class="desktop-bg min-h-[640px] relative grid-pattern">
+    <div class="absolute top-6 left-6 max-w-md anim-in">
+      <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-bg2 border border-accent/30 text-accent">
+        <span class="w-1.5 h-1.5 rounded-full bg-accent anim-armed"></span>
+        Estado · armed
+      </span>
+      <h2 class="text-2xl font-semibold mt-3">Hotkey pressionada, mic ativo</h2>
+      <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+        Pulse rápido cyan (scale 1↔1.4, 900ms). Halo expande e dissipa.
+        Sincronizado com o hold da tecla — solta = vai pra <code class="text-accent font-mono text-xs">capturing</code> imediato.
+      </p>
+    </div>
+
+    <div class="absolute top-20 right-12 w-[520px] h-[280px] bg-bg2 border border-border rounded-lg shadow-2xl overflow-hidden anim-in" style="animation-delay:80ms">
+      <div class="h-7 bg-surface flex items-center justify-between px-3 border-b border-border">
+        <span class="text-[11px] text-muted font-mono">💬 claude.exe — Chat</span>
+        <div class="flex gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+        </div>
+      </div>
+      <div class="p-4 text-sm text-fgsoft">
+        <div class="text-muted text-xs mb-2">você</div>
+        <div class="text-fg">Bora reescrever esse módulo de auth pra usar </div>
+        <div class="mt-2 text-faint italic text-xs">↑ cursor aguarda — flowtype vai colar aqui</div>
+      </div>
+    </div>
+
+    <div class="absolute bottom-6 right-6 anim-in" style="animation-delay:160ms">
+      <div class="overlay-card w-[200px] h-[64px] flex items-center px-4 shadow-overlay" style="border-color: rgba(95,230,255,0.4)">
+        <div class="flex items-center gap-3 w-full">
+          <span class="w-3 h-3 rounded-full bg-accent anim-armed flex-shrink-0"></span>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[11px] text-fg font-medium tracking-tight">segure e fale</span>
+            <span class="text-[9px] text-muted font-mono">Right Ctrl held · 0.3s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: OVERLAY CAPTURING                                -->
+<!-- ====================================================== -->
+<div id="view-overlay-capturing" class="view">
+  <div class="desktop-bg min-h-[640px] relative grid-pattern">
+    <div class="absolute top-6 left-6 max-w-md anim-in">
+      <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-bg2 border border-accent/30 text-accent">
+        <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+        Estado · capturing
+      </span>
+      <h2 class="text-2xl font-semibold mt-3">Capturando voz em tempo real</h2>
+      <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+        5 waveform bars reativas ao volume do mic via AnalyserNode (30fps).
+        Duration counter incrementa a cada 100ms. Solta a hotkey → STT dispara imediato.
+      </p>
+    </div>
+
+    <div class="absolute top-20 right-12 w-[520px] h-[280px] bg-bg2 border border-border rounded-lg shadow-2xl overflow-hidden anim-in" style="animation-delay:80ms">
+      <div class="h-7 bg-surface flex items-center justify-between px-3 border-b border-border">
+        <span class="text-[11px] text-muted font-mono">💬 claude.exe — Chat</span>
+        <div class="flex gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+        </div>
+      </div>
+      <div class="p-4 text-sm text-fgsoft">
+        <div class="text-muted text-xs mb-2">você</div>
+        <div class="text-fg">Bora reescrever esse módulo de auth pra usar </div>
+        <div class="mt-3 inline-flex items-center gap-2 px-2 py-1 rounded bg-accent/10 border border-accent/30 text-[10px] text-accent font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+          flowtype ouvindo…
+        </div>
+      </div>
+    </div>
+
+    <div class="absolute bottom-6 right-6 anim-in" style="animation-delay:160ms">
+      <div class="overlay-card w-[200px] h-[64px] flex items-center px-4 shadow-overlay" style="border-color: rgba(95,230,255,0.4)">
+        <div class="flex items-center gap-3 w-full">
+          <div class="flex items-end gap-[3px] h-7">
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+            <span class="wavebar"></span>
+          </div>
+          <div class="flex flex-col gap-0.5 ml-auto text-right">
+            <span class="text-[11px] text-fg font-medium tracking-tight">capturando</span>
+            <span class="text-[9px] text-accent font-mono">1.4s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: OVERLAY PROCESSING (com badge final)             -->
+<!-- ====================================================== -->
+<div id="view-overlay-processing" class="view">
+  <div class="desktop-bg min-h-[640px] relative grid-pattern">
+    <div class="absolute top-6 left-6 max-w-md anim-in">
+      <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-bg2 border border-accent/30 text-accent">
+        <svg class="w-3 h-3 anim-spin text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+        Estado · processing
+      </span>
+      <h2 class="text-2xl font-semibold mt-3">Transcrevendo & injetando</h2>
+      <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+        Spinner rotativo + texto fluido: <code class="text-accent font-mono text-xs">ouvindo…</code> →
+        <code class="text-accent font-mono text-xs">transcrevendo…</code> →
+        <code class="text-accent font-mono text-xs">colando…</code>.
+        Pós-paste: badge transitório 1.5s revela qual slot Groq foi usado.
+      </p>
+    </div>
+
+    <div class="absolute top-20 right-12 w-[520px] h-[280px] bg-bg2 border border-border rounded-lg shadow-2xl overflow-hidden anim-in" style="animation-delay:80ms">
+      <div class="h-7 bg-surface flex items-center justify-between px-3 border-b border-border">
+        <span class="text-[11px] text-muted font-mono">💬 claude.exe — Chat</span>
+        <div class="flex gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-borderstrong"></span>
+        </div>
+      </div>
+      <div class="p-4 text-sm text-fgsoft">
+        <div class="text-muted text-xs mb-2">você</div>
+        <div class="text-fg">
+          Bora reescrever esse módulo de auth pra usar
+          <span class="bg-accent/15 text-accent px-1 rounded">JWT stateless e remover a tabela sessions do schema.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- overlay processing -->
+    <div class="absolute bottom-6 right-6 flex flex-col items-end gap-2 anim-in" style="animation-delay:160ms">
+      <!-- badge transitório (mostra após paste) -->
+      <div class="overlay-card px-3 py-1.5 text-[10px] font-mono text-accent border border-accent/30 anim-badge">
+        ☁ Groq #1 · primary · 720ms
+      </div>
+
+      <div class="overlay-card w-[200px] h-[64px] flex items-center px-4 shadow-overlay" style="border-color: rgba(95,230,255,0.4)">
+        <div class="flex items-center gap-3 w-full">
+          <svg class="w-4 h-4 anim-spin text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[11px] text-fg font-medium tracking-tight">transcrevendo…</span>
+            <span class="text-[9px] text-muted font-mono">Groq · slot #1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: SETTINGS (STT com GroqSlotManager)               -->
+<!-- ====================================================== -->
+<div id="view-settings" class="view">
+  <div class="desktop-bg min-h-[640px] py-10 px-6 flex justify-center">
+    <!-- Settings window 480x720 -->
+    <div class="w-[480px] h-[720px] bg-bg1 border border-border rounded-xl shadow-overlay overflow-hidden flex flex-col anim-in">
+
+      <!-- title bar -->
+      <div class="h-11 bg-bg2 border-b border-border flex items-center justify-between px-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-5 h-5 rounded bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+          </div>
+          <span class="text-sm font-semibold tracking-tight">Settings</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="w-6 h-6 rounded hover:bg-surface flex items-center justify-center text-muted text-xs">─</button>
+          <button class="w-6 h-6 rounded hover:bg-surface flex items-center justify-center text-muted text-xs">×</button>
+        </div>
+      </div>
+
+      <!-- body: sidebar + content -->
+      <div class="flex-1 flex overflow-hidden">
+
+        <!-- sidebar -->
+        <div class="w-[140px] bg-bg0 border-r border-border py-3 px-2 space-y-0.5 text-xs">
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>⌨</span><span>Hotkey</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>🎙</span><span>Microfone</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded bg-surface text-accent flex items-center gap-2 border border-accent/30">
+            <span>☁</span><span>STT Provider</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>🌐</span><span>Idioma</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>📚</span><span>Vocabulário</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>⚡</span><span>Auto-start</span>
+          </button>
+          <button class="w-full text-left px-2.5 py-2 rounded text-muted hover:bg-bg2 hover:text-fgsoft flex items-center gap-2">
+            <span>ⓘ</span><span>Sobre</span>
+          </button>
+
+          <div class="pt-3 mt-3 border-t border-border">
+            <div class="px-2.5 text-[9px] text-faint font-mono uppercase tracking-wider mb-1">versão</div>
+            <div class="px-2.5 text-[10px] text-muted font-mono">v0.1.0</div>
+          </div>
+        </div>
+
+        <!-- content -->
+        <div class="flex-1 overflow-y-auto p-5 space-y-5">
+          <!-- section header -->
+          <div>
+            <h2 class="text-base font-semibold tracking-tight">STT Provider</h2>
+            <p class="text-xs text-muted mt-1">Pool de até 3 keys Groq + fallback faster-whisper local</p>
+          </div>
+
+          <!-- pool summary -->
+          <div class="bg-bg2 border border-border rounded-lg p-3 flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full dot-online"></span>
+              <span class="w-2 h-2 rounded-full dot-online"></span>
+              <span class="w-2 h-2 rounded-full bg-faint"></span>
+            </div>
+            <div class="text-xs">
+              <span class="text-fg font-medium">2 de 3 slots ativos</span>
+              <span class="text-muted"> · </span>
+              <span class="text-muted">8.4k / 43.2k req disponíveis hoje</span>
+            </div>
+            <button class="ml-auto text-[10px] text-accent hover:text-accent2 font-medium">Testar pool ↗</button>
+          </div>
+
+          <!-- GROQ SLOT MANAGER (3 cards) -->
+          <div class="space-y-2.5">
+
+            <!-- Slot #1 — online -->
+            <div class="bg-bg2 border border-border rounded-lg p-3.5">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-mono text-muted uppercase tracking-wider">Slot #1</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success font-medium border border-success/30 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full dot-online"></span>
+                    online
+                  </span>
+                </div>
+                <div class="flex gap-1">
+                  <button class="px-2 py-0.5 text-[10px] text-muted hover:text-accent rounded hover:bg-surface">testar</button>
+                  <button class="px-2 py-0.5 text-[10px] text-muted hover:text-danger rounded hover:bg-surface">remover</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <div class="text-[9px] text-faint uppercase tracking-wider mb-0.5">label</div>
+                  <div class="text-xs text-fg font-medium">primary</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-faint uppercase tracking-wider mb-0.5">key</div>
+                  <div class="text-xs text-fgsoft font-mono">gsk_•••••4f2a</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono mb-1">
+                <span class="text-muted">1.2k / 14.4k req hoje</span>
+                <span class="text-accent">8%</span>
+              </div>
+              <div class="w-full h-1 bg-bg0 rounded-full overflow-hidden">
+                <div class="h-full meter-fill rounded-full" style="width:8%"></div>
+              </div>
+            </div>
+
+            <!-- Slot #2 — online -->
+            <div class="bg-bg2 border border-border rounded-lg p-3.5">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-mono text-muted uppercase tracking-wider">Slot #2</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success font-medium border border-success/30 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full dot-online"></span>
+                    online
+                  </span>
+                </div>
+                <div class="flex gap-1">
+                  <button class="px-2 py-0.5 text-[10px] text-muted hover:text-accent rounded hover:bg-surface">testar</button>
+                  <button class="px-2 py-0.5 text-[10px] text-muted hover:text-danger rounded hover:bg-surface">remover</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <div class="text-[9px] text-faint uppercase tracking-wider mb-0.5">label</div>
+                  <div class="text-xs text-fg font-medium">backup-conta-2</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-faint uppercase tracking-wider mb-0.5">key</div>
+                  <div class="text-xs text-fgsoft font-mono">gsk_•••••a91c</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono mb-1">
+                <span class="text-muted">3.4k / 14.4k req hoje</span>
+                <span class="text-accent">24%</span>
+              </div>
+              <div class="w-full h-1 bg-bg0 rounded-full overflow-hidden">
+                <div class="h-full meter-fill rounded-full" style="width:24%"></div>
+              </div>
+            </div>
+
+            <!-- Slot #3 — empty -->
+            <button class="w-full bg-bg2 border border-dashed border-border rounded-lg p-3.5 hover:border-accent/40 hover:bg-surface transition group">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[11px] font-mono text-faint uppercase tracking-wider group-hover:text-muted">Slot #3</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg0 text-faint font-medium border border-border">vazio</span>
+              </div>
+              <div class="flex items-center justify-center gap-2 py-3">
+                <span class="w-7 h-7 rounded-full border border-dashed border-faint group-hover:border-accent group-hover:text-accent flex items-center justify-center text-faint text-lg leading-none">+</span>
+                <div class="text-left">
+                  <div class="text-xs text-fgsoft group-hover:text-fg">Adicionar key Groq</div>
+                  <div class="text-[10px] text-faint">+14.4k req/dia grátis</div>
+                </div>
+              </div>
+            </button>
+
+          </div>
+
+          <!-- divider -->
+          <div class="border-t border-border"></div>
+
+          <!-- force local toggle -->
+          <div>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-medium text-fg">Forçar fallback local sempre</div>
+                <div class="text-[10px] text-muted mt-0.5">Pula Groq pool — usa faster-whisper local (mais lento, mais privado)</div>
+              </div>
+              <button class="w-9 h-5 rounded-full bg-bg0 border border-border relative">
+                <span class="absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-muted transition"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- inline test -->
+          <div class="bg-bg2 border border-border rounded-lg p-3.5">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-xs font-medium">Testar transcrição</span>
+              <span class="text-[10px] text-muted">grava 3s e mostra slot usado</span>
+            </div>
+            <button class="w-full h-9 rounded-lg bg-accent/10 hover:bg-accent/15 border border-accent/30 text-accent text-xs font-medium flex items-center justify-center gap-2">
+              <span>🎙</span>
+              <span>Gravar 3s e testar</span>
+            </button>
+            <div class="mt-3 text-[10px] font-mono text-muted">
+              último teste: <span class="text-accent">"olá flowtype, isso é um teste"</span><br/>
+              ☁ Groq #1 · primary · 720ms · 0 erros
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- status bar -->
+      <div class="h-7 bg-bg2 border-t border-border flex items-center px-3 gap-3 text-[10px] font-mono text-muted">
+        <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full dot-online"></span>2 slots online</span>
+        <span class="text-faint">·</span>
+        <span>auto-save ativo</span>
+        <span class="ml-auto text-accent">salvo às 14:32</span>
+      </div>
+
+    </div>
+
+    <!-- caption side -->
+    <div class="ml-8 max-w-xs anim-in" style="animation-delay:120ms">
+      <span class="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-bg2 border border-border text-muted">
+        Settings window · 480×720
+      </span>
+      <h3 class="text-lg font-semibold mt-3">GroqSlotManager em ação</h3>
+      <p class="text-xs text-fgsoft mt-2 leading-relaxed">
+        3 cards horizontais com status badges (online/invalid/exhausted),
+        usage bar live, ações testar/remover. Slot vazio é CTA "+" com hover state.
+        Pool summary no topo consolida o estado.
+      </p>
+      <p class="text-[10px] text-muted mt-3 font-mono">
+        Reutilizado idêntico no Onboarding step 4 (CR-1)
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: HISTORY                                          -->
+<!-- ====================================================== -->
+<div id="view-history" class="view">
+  <div class="desktop-bg min-h-[640px] py-10 px-6 flex justify-center">
+    <!-- History window 640x720 -->
+    <div class="w-[640px] h-[720px] bg-bg1 border border-border rounded-xl shadow-overlay overflow-hidden flex flex-col anim-in">
+
+      <!-- title bar -->
+      <div class="h-11 bg-bg2 border-b border-border flex items-center justify-between px-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-5 h-5 rounded bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+          </div>
+          <span class="text-sm font-semibold tracking-tight">Histórico</span>
+          <span class="text-[10px] text-muted font-mono ml-2">128 transcrições</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">
+            <span>⤓</span> Exportar
+          </button>
+          <button class="w-6 h-6 rounded hover:bg-surface flex items-center justify-center text-muted text-xs">×</button>
+        </div>
+      </div>
+
+      <!-- search + filters -->
+      <div class="p-4 border-b border-border bg-bg0 space-y-3">
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">🔍</span>
+          <input type="text" placeholder="buscar nas transcrições (FTS5)…" value="reunião" class="w-full h-9 pl-9 pr-9 rounded-lg bg-bg2 border border-border text-sm text-fg placeholder:text-faint focus:border-accent/50 focus:bg-surface transition" />
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-fg w-6 h-6 rounded-full hover:bg-surface flex items-center justify-center text-xs">×</button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[10px] text-faint font-mono uppercase tracking-wider">data</span>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-accent text-bg0 font-semibold">Hoje</button>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-bg2 text-muted hover:text-fg border border-border">7 dias</button>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-bg2 text-muted hover:text-fg border border-border">30 dias</button>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-bg2 text-muted hover:text-fg border border-border">Tudo</button>
+          <div class="w-px h-4 bg-border mx-1"></div>
+          <span class="text-[10px] text-faint font-mono uppercase tracking-wider">app</span>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-bg2 text-fgsoft border border-border inline-flex items-center gap-1">
+            💬 claude.exe <span class="text-faint hover:text-danger">×</span>
+          </button>
+          <button class="px-2.5 py-1 rounded-full text-[10px] bg-bg2 text-muted hover:text-fg border border-dashed border-border">+ app</button>
+          <span class="ml-auto text-[10px] text-muted font-mono">15 resultados</span>
+        </div>
+      </div>
+
+      <!-- timeline -->
+      <div class="flex-1 overflow-y-auto divide-y divide-border">
+
+        <!-- item 1 -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span class="text-accent">há 2 min</span>
+              <span class="text-faint">·</span>
+              <span>💬 claude.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"Claude — Chat"</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slot1/40 text-slot1 font-medium inline-flex items-center gap-1.5">
+              ☁ Groq #1 · 720ms
+            </span>
+          </div>
+          <div class="text-sm text-fg leading-relaxed">
+            Preciso refatorar o módulo de autenticação pra usar JWT stateless e
+            <mark class="bg-accent/20 text-accent2 px-0.5 rounded">reunião</mark>
+            com o time backend semana que vem.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">
+              ▶ 00:04
+            </button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">
+              ✎ editar
+            </button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">
+              ⎘ copiar
+            </button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">
+              🗑
+            </button>
+          </div>
+        </div>
+
+        <!-- item 2 — local fallback -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span class="text-accent">há 14 min</span>
+              <span class="text-faint">·</span>
+              <span>📝 notepad.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"Sem título"</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slotlocal/40 text-slotlocal font-medium inline-flex items-center gap-1.5">
+              💻 local · 3.2s
+            </span>
+          </div>
+          <div class="text-sm text-fg leading-relaxed">
+            Lista de compras: pão, leite, café, queijo, manteiga, e umas frutas se sobrar tempo no mercado.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">▶ 00:08</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">✎ editar</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">⎘ copiar</button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">🗑</button>
+          </div>
+        </div>
+
+        <!-- item 3 — com vocab correction badge -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span class="text-accent">há 32 min</span>
+              <span class="text-faint">·</span>
+              <span>💬 claude.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"Claude — Chat"</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-accent/30 text-accent font-medium inline-flex items-center gap-1">
+                📚 1 vocab
+              </span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slot2/40 text-slot2 font-medium inline-flex items-center gap-1.5">
+                ☁ Groq #2 · 680ms
+              </span>
+            </div>
+          </div>
+          <div class="text-sm text-fg leading-relaxed">
+            <span class="line-through text-faint">kunha</span>
+            <mark class="bg-accent/15 text-accent2 px-1 rounded">Cunha</mark>
+            chegou cedo e já adiantou os tickets de bug do sprint atual.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">▶ 00:06</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">✎ editar</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">⎘ copiar</button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">🗑</button>
+          </div>
+        </div>
+
+        <!-- item 4 — VSCode -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span class="text-accent">há 1h</span>
+              <span class="text-faint">·</span>
+              <span>📘 Code.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"GroqSlotManager.tsx — flowtype"</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slot1/40 text-slot1 font-medium inline-flex items-center gap-1.5">
+              ☁ Groq #1 · 840ms
+            </span>
+          </div>
+          <div class="text-sm text-fg leading-relaxed font-mono">
+            Adiciona prop opcional mode equals string union full pipe compact, default full.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">▶ 00:05</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">✎ editar</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">⎘ copiar</button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">🗑</button>
+          </div>
+        </div>
+
+        <!-- item 5 — WhatsApp -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span class="text-accent">há 2h</span>
+              <span class="text-faint">·</span>
+              <span>📱 chrome.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"WhatsApp Web — Família"</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slot2/40 text-slot2 font-medium inline-flex items-center gap-1.5">
+              ☁ Groq #2 · 690ms
+            </span>
+          </div>
+          <div class="text-sm text-fg leading-relaxed">
+            Vou chegar mais cedo no jantar de domingo, qualquer coisa avisa o Pedro pra ir buscar a vó.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">▶ 00:07</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">✎ editar</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">⎘ copiar</button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">🗑</button>
+          </div>
+        </div>
+
+        <!-- separator dia -->
+        <div class="px-4 py-2 bg-bg0 text-[10px] font-mono text-faint uppercase tracking-wider">
+          ─── ontem ───
+        </div>
+
+        <!-- item 6 -->
+        <div class="hist-item p-4 cursor-pointer">
+          <div class="flex items-center justify-between mb-2 text-[10px] font-mono">
+            <div class="flex items-center gap-2 text-muted">
+              <span>ontem 18:42</span>
+              <span class="text-faint">·</span>
+              <span>💬 slack.exe</span>
+              <span class="text-faint">·</span>
+              <span class="text-faint">"#dev — Slack"</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-bg2 border border-slot1/40 text-slot1 font-medium inline-flex items-center gap-1.5">
+              ☁ Groq #1 · 710ms
+            </span>
+          </div>
+          <div class="text-sm text-fg leading-relaxed">
+            Time, deploy do flowtype v0.1 sai sexta. Quem ainda tem PR aberto, fechar até quinta de manhã.
+          </div>
+          <div class="mt-3 flex items-center gap-1">
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono">▶ 00:06</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">✎ editar</button>
+            <button class="px-2 py-1 rounded text-[10px] text-muted hover:bg-surface hover:text-accent flex items-center gap-1">⎘ copiar</button>
+            <button class="ml-auto px-2 py-1 rounded text-[10px] text-faint hover:bg-surface hover:text-danger">🗑</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- status bar -->
+      <div class="h-7 bg-bg2 border-t border-border flex items-center px-3 gap-3 text-[10px] font-mono text-muted">
+        <span>15 de 128 mostrados</span>
+        <span class="text-faint">·</span>
+        <span>FTS5 ativo</span>
+        <span class="ml-auto text-accent">⌃ K para busca rápida</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: ONBOARDING (4 steps em uma tela)                 -->
+<!-- ====================================================== -->
+<div id="view-onboarding" class="view">
+  <div class="desktop-bg min-h-[640px] py-10 px-6 flex justify-center">
+
+    <div class="w-[720px] anim-in">
+      <!-- step nav (toggle entre steps) -->
+      <div class="flex items-center justify-center gap-2 mb-6">
+        <button onclick="showStep(1)" class="step-btn px-3 py-1.5 rounded text-[10px] font-mono text-muted hover:text-accent border border-border hover:border-accent/40">Step 1</button>
+        <button onclick="showStep(2)" class="step-btn px-3 py-1.5 rounded text-[10px] font-mono text-muted hover:text-accent border border-border hover:border-accent/40">Step 2</button>
+        <button onclick="showStep(3)" class="step-btn px-3 py-1.5 rounded text-[10px] font-mono text-muted hover:text-accent border border-border hover:border-accent/40">Step 3</button>
+        <button onclick="showStep(4)" class="step-btn px-3 py-1.5 rounded text-[10px] font-mono text-muted hover:text-accent border border-border hover:border-accent/40">Step 4</button>
+      </div>
+
+      <!-- wizard window -->
+      <div class="w-full bg-bg1 border border-border rounded-xl shadow-overlay overflow-hidden">
+
+        <!-- dot nav -->
+        <div class="h-12 bg-bg2 border-b border-border flex items-center justify-between px-6">
+          <div class="flex items-center gap-2 wizard-dots">
+            <span class="wizard-dot active"></span>
+            <span class="wizard-dot"></span>
+            <span class="wizard-dot"></span>
+            <span class="wizard-dot"></span>
+          </div>
+          <span class="text-[10px] text-muted font-mono"><span id="step-label">Passo 1 de 4</span></span>
+        </div>
+
+        <!-- STEP 1 — Welcome -->
+        <div id="wstep-1" class="wizard-step active p-10">
+          <div class="text-center max-w-md mx-auto">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0 shadow-glowStrong">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+            </div>
+            <h2 class="text-2xl font-semibold tracking-tight">Bem-vindo ao flowtype</h2>
+            <p class="text-sm text-fgsoft mt-3 leading-relaxed">
+              Sua voz vira texto onde você estiver — sem limite de tokens, sub-1s,
+              e com fallback local quando estiver offline.
+            </p>
+
+            <div class="mt-8 space-y-3 text-left">
+              <div class="flex items-start gap-3 p-3 rounded-lg bg-bg2 border border-border">
+                <span class="text-accent text-lg leading-none mt-0.5">∞</span>
+                <div>
+                  <div class="text-sm font-medium text-fg">Sem limite de tokens (free)</div>
+                  <div class="text-xs text-muted mt-0.5">Wispr cobra após N transcrições/mês. flowtype usa Groq free tier (14.4k req/dia POR key).</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-3 rounded-lg bg-bg2 border border-border">
+                <span class="text-accent text-lg leading-none mt-0.5">⚡</span>
+                <div>
+                  <div class="text-sm font-medium text-fg">Sub-1s via Groq cloud</div>
+                  <div class="text-xs text-muted mt-0.5">Whisper Large v3 Turbo na infraestrutura Groq. Latência p50 ~720ms.</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-3 rounded-lg bg-bg2 border border-border">
+                <span class="text-accent text-lg leading-none mt-0.5">💻</span>
+                <div>
+                  <div class="text-sm font-medium text-fg">Fallback local quando offline</div>
+                  <div class="text-xs text-muted mt-0.5">faster-whisper small.en bundled (~140MB). Funciona sem internet.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 — Mic -->
+        <div id="wstep-2" class="wizard-step p-10">
+          <div class="max-w-md mx-auto">
+            <h2 class="text-2xl font-semibold tracking-tight">Permitir microfone</h2>
+            <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+              flowtype precisa do mic pra capturar sua voz. Nada é enviado sem você apertar a hotkey.
+            </p>
+
+            <div class="mt-6 p-4 rounded-lg bg-bg2 border border-border">
+              <div class="text-[10px] text-faint uppercase tracking-wider mb-2 font-mono">dispositivo de entrada</div>
+              <div class="relative">
+                <select class="w-full h-10 bg-bg0 border border-border rounded-lg px-3 text-sm text-fg appearance-none focus:border-accent/50">
+                  <option>🎙 Realtek Audio (default)</option>
+                  <option>🎧 Headset Logitech G733</option>
+                  <option>🔌 USB Microphone Blue Yeti</option>
+                </select>
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">▾</span>
+              </div>
+
+              <div class="mt-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[10px] text-faint uppercase tracking-wider font-mono">nível de input</span>
+                  <span class="text-[10px] text-accent font-mono">-12 dB</span>
+                </div>
+                <div class="h-2 bg-bg0 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+                  <div class="h-full meter-fill rounded-sm" style="width:18%"></div>
+                  <div class="h-full meter-fill rounded-sm" style="width:14%"></div>
+                  <div class="h-full meter-fill rounded-sm" style="width:22%"></div>
+                  <div class="h-full meter-fill rounded-sm" style="width:8%"></div>
+                  <div class="h-full meter-fill rounded-sm" style="width:16%"></div>
+                  <div class="h-full bg-faint/30 rounded-sm flex-1"></div>
+                </div>
+                <p class="text-[10px] text-muted mt-2 font-mono">fale alguma coisa pra testar — as barras deveriam reagir</p>
+              </div>
+            </div>
+
+            <div class="mt-4 p-3 rounded-lg bg-success/5 border border-success/30 flex items-center gap-2 text-xs text-success">
+              <span>✓</span>
+              <span>Permissão concedida — mic funcionando</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 — Hotkey -->
+        <div id="wstep-3" class="wizard-step p-10">
+          <div class="max-w-md mx-auto">
+            <h2 class="text-2xl font-semibold tracking-tight">Calibrar hotkey</h2>
+            <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+              Segure essa tecla pra gravar. Solte pra transcrever e colar no campo ativo.
+            </p>
+
+            <div class="mt-8 text-center">
+              <div class="inline-block px-8 py-6 rounded-2xl bg-bg2 border-2 border-accent/40 shadow-glow">
+                <div class="text-[10px] text-faint uppercase tracking-wider font-mono mb-2">hotkey atual</div>
+                <div class="text-4xl font-mono font-semibold text-accent tracking-wider">Right Ctrl</div>
+                <div class="text-[10px] text-muted mt-2">hold mode · 300ms anti-tap</div>
+              </div>
+
+              <div class="mt-4 flex items-center justify-center gap-2">
+                <button class="px-3 py-1.5 text-xs rounded-lg bg-bg2 border border-border text-fgsoft hover:border-accent/40 hover:text-accent">
+                  Mudar tecla
+                </button>
+                <button class="px-3 py-1.5 text-xs rounded-lg bg-accent/10 border border-accent/30 text-accent hover:bg-accent/15">
+                  Testar agora
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-8 p-4 rounded-lg bg-bg2 border border-success/30">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-success/10 border border-success/30 flex items-center justify-center text-success text-lg">✓</div>
+                <div>
+                  <div class="text-sm font-medium text-success">Funcionando perfeito!</div>
+                  <div class="text-[10px] text-muted font-mono mt-0.5">press detectado em 28ms · release em 12ms</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4 — Test + Groq pool -->
+        <div id="wstep-4" class="wizard-step p-10">
+          <div class="max-w-lg mx-auto">
+            <h2 class="text-2xl font-semibold tracking-tight">Teste real + configurar Groq</h2>
+            <p class="text-sm text-fgsoft mt-2 leading-relaxed">
+              Adicione 1 key Groq pra transcrição rápida (free, 14.4k req/dia). Quer triplicar? Adicione +2 keys.
+            </p>
+
+            <!-- GroqSlotManager mode=compact -->
+            <div class="mt-6 space-y-2">
+              <!-- Slot #1 — preenchido bootstrap -->
+              <div class="bg-bg2 border border-border rounded-lg p-3.5">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-mono text-muted uppercase tracking-wider">Slot #1</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success font-medium border border-success/30 inline-flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full dot-online"></span>
+                      online
+                    </span>
+                  </div>
+                  <span class="text-[10px] text-muted font-mono">bootstrap</span>
+                </div>
+                <div class="text-xs text-fgsoft font-mono">gsk_•••••4f2a · primary · 14.4k/dia</div>
+              </div>
+
+              <!-- Triplicar collapsed CTA -->
+              <details class="bg-bg2 border border-dashed border-border rounded-lg group">
+                <summary class="cursor-pointer p-3.5 flex items-center gap-3 hover:bg-surface rounded-lg">
+                  <span class="text-accent text-lg">⚡</span>
+                  <div class="flex-1">
+                    <div class="text-xs font-medium text-fg">Triplicar sua quota grátis</div>
+                    <div class="text-[10px] text-muted">Adicione +1 ou +2 keys (cada uma vale +14.4k req/dia)</div>
+                  </div>
+                  <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+                </summary>
+                <div class="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-border">
+                  <!-- Slot #2 vazio -->
+                  <button class="w-full bg-bg0 border border-dashed border-border rounded-lg p-3 hover:border-accent/40 transition flex items-center gap-2 text-left">
+                    <span class="w-6 h-6 rounded-full border border-dashed border-faint flex items-center justify-center text-faint">+</span>
+                    <span class="text-xs text-fgsoft">Adicionar Slot #2</span>
+                    <span class="ml-auto text-[10px] text-faint font-mono">+14.4k req/dia</span>
+                  </button>
+                  <!-- Slot #3 vazio -->
+                  <button class="w-full bg-bg0 border border-dashed border-border rounded-lg p-3 hover:border-accent/40 transition flex items-center gap-2 text-left">
+                    <span class="w-6 h-6 rounded-full border border-dashed border-faint flex items-center justify-center text-faint">+</span>
+                    <span class="text-xs text-fgsoft">Adicionar Slot #3</span>
+                    <span class="ml-auto text-[10px] text-faint font-mono">+14.4k req/dia</span>
+                  </button>
+                  <a href="#" class="block text-[10px] text-accent hover:text-accent2 font-mono pt-1">
+                    ↗ console.groq.com (criar key grátis)
+                  </a>
+                </div>
+              </details>
+
+              <!-- Test inline -->
+              <div class="bg-bg2 border border-border rounded-lg p-4 mt-3">
+                <div class="text-xs font-medium text-fg mb-3">Teste real de transcrição</div>
+                <button class="w-full h-11 rounded-lg bg-accent/10 hover:bg-accent/15 border border-accent/30 text-accent text-sm font-medium flex items-center justify-center gap-2">
+                  <span class="text-base">🎙</span>
+                  <span>Gravar 5s e testar</span>
+                </button>
+
+                <div class="mt-3 p-3 rounded-lg bg-bg0 border border-success/30">
+                  <div class="text-[10px] text-faint uppercase tracking-wider font-mono mb-1">resultado</div>
+                  <div class="text-sm text-fg italic">"olá flowtype, isso é um teste de transcrição"</div>
+                  <div class="mt-2 text-[10px] font-mono text-muted">
+                    ☁ Groq #1 · primary · <span class="text-accent">720ms</span> · WER 0%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- footer actions -->
+        <div class="h-14 bg-bg2 border-t border-border flex items-center justify-between px-6">
+          <button id="btn-back" onclick="prevStep()" class="px-3 py-1.5 text-xs text-muted hover:text-fg rounded">← Voltar</button>
+          <div class="flex items-center gap-3">
+            <button class="px-3 py-1.5 text-xs text-muted hover:text-danger rounded">Pular onboarding</button>
+            <button id="btn-next" onclick="nextStep()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-accent text-bg0 hover:bg-accent2 shadow-glow">
+              Próximo →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-center text-[10px] text-muted font-mono mt-4">
+        wizard só aparece no first-run — settings.first_run_completed=false
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- VIEW: SITE LANDING                                     -->
+<!-- ====================================================== -->
+<div id="view-site" class="view">
+  <div class="site-bg min-h-screen">
+
+    <!-- site nav -->
+    <header class="border-b border-border bg-bg0/80 backdrop-blur sticky top-[57px] z-40">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0 shadow-glow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+          </div>
+          <span class="text-sm font-semibold tracking-tight">flowtype</span>
+        </div>
+        <nav class="hidden md:flex items-center gap-6 text-xs text-fgsoft">
+          <a href="#how" class="hover:text-accent">Como funciona</a>
+          <a href="#compare" class="hover:text-accent">vs Wispr</a>
+          <a href="#features" class="hover:text-accent">Features</a>
+          <a href="#faq" class="hover:text-accent">FAQ</a>
+          <a href="#" class="hover:text-accent">GitHub ↗</a>
+        </nav>
+        <a href="#download" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent text-bg0 hover:bg-accent2 shadow-glow">
+          Baixar .exe
+        </a>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="max-w-5xl mx-auto px-6 pt-20 pb-24 text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-bg2 border border-accent/30 text-[10px] font-mono text-accent mb-6 anim-in">
+        <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+        v0.1 · Windows · 100% free
+      </div>
+      <h1 class="text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] anim-in" style="animation-delay:80ms">
+        sua voz vira texto<br/>
+        <span class="flow-gradient bg-clip-text text-transparent">onde você estiver</span>
+      </h1>
+      <p class="text-base md:text-lg text-fgsoft mt-6 max-w-2xl mx-auto leading-relaxed anim-in" style="animation-delay:160ms">
+        Segure <code class="px-1.5 py-0.5 rounded bg-bg2 border border-border font-mono text-sm text-accent">Right Ctrl</code>,
+        fale, solta. Em menos de 1 segundo o texto aparece no campo ativo — Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, qualquer app.
+      </p>
+      <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 anim-in" style="animation-delay:240ms">
+        <a href="#download" class="px-6 py-3 text-sm font-semibold rounded-lg bg-accent text-bg0 hover:bg-accent2 shadow-glowStrong flex items-center gap-2">
+          <span>⤓</span>
+          Baixar para Windows
+          <span class="text-[10px] opacity-70 font-mono">v0.1.0 · 180MB</span>
+        </a>
+        <a href="#how" class="px-6 py-3 text-sm font-semibold rounded-lg bg-bg2 border border-border text-fgsoft hover:border-accent/40 hover:text-accent">
+          Ver como funciona ↓
+        </a>
+      </div>
+
+      <!-- mini overlay preview -->
+      <div class="mt-16 inline-flex items-center gap-4 px-6 py-4 rounded-xl bg-bg2 border border-border shadow-overlay anim-in" style="animation-delay:320ms">
+        <div class="flex items-end gap-[3px] h-7">
+          <span class="wavebar"></span>
+          <span class="wavebar"></span>
+          <span class="wavebar"></span>
+          <span class="wavebar"></span>
+          <span class="wavebar"></span>
+        </div>
+        <span class="text-xs text-fgsoft font-mono">capturando…</span>
+        <span class="text-[10px] text-muted">→</span>
+        <span class="text-xs text-accent">"Bora reescrever o módulo de auth pra usar JWT stateless."</span>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how" class="max-w-6xl mx-auto px-6 py-20">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-semibold tracking-tight">Como funciona</h2>
+        <p class="text-sm text-muted mt-2">3 passos. Sem mouse, sem menu, sem fricção.</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="feature-card p-6 rounded-xl bg-bg2 border border-border">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-8 h-8 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent text-xs font-mono font-semibold">01</span>
+            <span class="text-xs text-muted font-mono">300ms anti-tap</span>
+          </div>
+          <h3 class="text-lg font-semibold tracking-tight">Segure Right Ctrl</h3>
+          <p class="text-sm text-fgsoft mt-2 leading-relaxed">Overlay no canto pulsa cyan. Mic está ativo, gravando.</p>
+          <div class="mt-4 h-32 rounded-lg bg-bg0 border border-border flex items-center justify-center">
+            <div class="w-3 h-3 rounded-full bg-accent anim-armed"></div>
+          </div>
+        </div>
+
+        <div class="feature-card p-6 rounded-xl bg-bg2 border border-border">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-8 h-8 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent text-xs font-mono font-semibold">02</span>
+            <span class="text-xs text-muted font-mono">capturing 30fps</span>
+          </div>
+          <h3 class="text-lg font-semibold tracking-tight">Fale naturalmente</h3>
+          <p class="text-sm text-fgsoft mt-2 leading-relaxed">Waveform live reage ao seu volume. Suporta PT, EN, ES, FR, DE, IT.</p>
+          <div class="mt-4 h-32 rounded-lg bg-bg0 border border-border flex items-center justify-center">
+            <div class="flex items-end gap-1 h-10">
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+              <span class="wavebar"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card p-6 rounded-xl bg-bg2 border border-border">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-8 h-8 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent text-xs font-mono font-semibold">03</span>
+            <span class="text-xs text-muted font-mono">p50 720ms</span>
+          </div>
+          <h3 class="text-lg font-semibold tracking-tight">Solte e cole</h3>
+          <p class="text-sm text-fgsoft mt-2 leading-relaxed">Solta a tecla. Sub-1s depois, texto aparece no campo ativo do app em foco.</p>
+          <div class="mt-4 h-32 rounded-lg bg-bg0 border border-border flex items-center justify-center px-4 text-center">
+            <span class="text-xs text-accent2 font-mono">"sua voz virou texto. ✓"</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPARE -->
+    <section id="compare" class="max-w-5xl mx-auto px-6 py-20">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-semibold tracking-tight">flowtype vs Wispr Flow</h2>
+        <p class="text-sm text-muted mt-2">O mesmo padrão de UX, sem o cap de tokens.</p>
+      </div>
+
+      <div class="rounded-xl bg-bg2 border border-border overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-bg0 border-b border-border">
+            <tr>
+              <th class="text-left px-4 py-3 text-[10px] font-mono uppercase tracking-wider text-muted font-medium">Critério</th>
+              <th class="text-left px-4 py-3 text-[10px] font-mono uppercase tracking-wider text-muted font-medium">Wispr Flow</th>
+              <th class="text-left px-4 py-3 text-[10px] font-mono uppercase tracking-wider text-accent font-medium">flowtype</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            <tr><td class="px-4 py-3 text-fgsoft">Preço</td><td class="px-4 py-3 text-warning">Pago após N tokens</td><td class="px-4 py-3 text-success font-medium">Free, sem limite</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">STT engine</td><td class="px-4 py-3 text-warning">Cloud only</td><td class="px-4 py-3 text-success font-medium">Groq pool (3 keys) + local fallback</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">Privacy fallback</td><td class="px-4 py-3 text-warning">Áudio sempre sai</td><td class="px-4 py-3 text-success font-medium">Modo local-only disponível</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">Vocab custom</td><td class="px-4 py-3 text-warning">Limitado</td><td class="px-4 py-3 text-success font-medium">Lista global ou per-app</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">Histórico searchable</td><td class="px-4 py-3 text-warning">Sim, sem busca FTS</td><td class="px-4 py-3 text-success font-medium">FTS5 + export md/json</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">Open source</td><td class="px-4 py-3 text-warning">Não</td><td class="px-4 py-3 text-success font-medium">Sim (MIT)</td></tr>
+            <tr><td class="px-4 py-3 text-fgsoft">Plataformas v0.1</td><td class="px-4 py-3 text-success">Win + Mac</td><td class="px-4 py-3 text-warning">Windows only (Mac/Linux roadmap)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FEATURES GRID -->
+    <section id="features" class="max-w-6xl mx-auto px-6 py-20">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-semibold tracking-tight">Features</h2>
+        <p class="text-sm text-muted mt-2">Tudo que o Wispr tem, mais o que faltava.</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">⌨</div>
+          <h3 class="text-sm font-semibold">Hotkey global</h3>
+          <p class="text-xs text-muted mt-1">Right Ctrl default, customizável. Hold detection via uIOhook.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">⚡</div>
+          <h3 class="text-sm font-semibold">Sub-1s STT</h3>
+          <p class="text-xs text-muted mt-1">Groq Whisper Large v3 Turbo. p50 720ms hotkey→paste.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">☁☁☁</div>
+          <h3 class="text-sm font-semibold">Pool de 3 keys</h3>
+          <p class="text-xs text-muted mt-1">Round-robin entre 3 Groq keys = 43.2k req/dia grátis.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">💻</div>
+          <h3 class="text-sm font-semibold">Fallback local</h3>
+          <p class="text-xs text-muted mt-1">faster-whisper small.en bundled. Funciona offline.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">📚</div>
+          <h3 class="text-sm font-semibold">Vocabulário custom</h3>
+          <p class="text-xs text-muted mt-1">Correções term_wrong→term_correct, global ou per-app.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">🕘</div>
+          <h3 class="text-sm font-semibold">Histórico FTS5</h3>
+          <p class="text-xs text-muted mt-1">Busca full-text, filtros por data/app, export md/json.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">🎯</div>
+          <h3 class="text-sm font-semibold">Overlay 4 estados</h3>
+          <p class="text-xs text-muted mt-1">idle, armed, capturing, processing. Always-on-top, slim.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">🔇</div>
+          <h3 class="text-sm font-semibold">Mute on/off</h3>
+          <p class="text-xs text-muted mt-1">Pausa hotkey sem fechar app. Tray icon ou hotkey.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">🚫</div>
+          <h3 class="text-sm font-semibold">Whitelist por app</h3>
+          <p class="text-xs text-muted mt-1">Bloqueie ou troque pra typing simulado em apps específicos.</p>
+        </div>
+        <div class="feature-card p-5 rounded-xl bg-bg2 border border-border">
+          <div class="text-accent text-xl mb-3">⏻</div>
+          <h3 class="text-sm font-semibold">Auto-start Windows</h3>
+          <p class="text-xs text-muted mt-1">Liga junto com o Windows. Roda silencioso no tray.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download" class="max-w-3xl mx-auto px-6 py-20">
+      <div class="rounded-2xl bg-gradient-to-br from-bg2 to-bg1 border border-accent/30 p-10 text-center shadow-overlay">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/30 text-[10px] font-mono text-accent mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+          v0.1.0 · disponível agora
+        </div>
+        <h2 class="text-3xl font-semibold tracking-tight">Baixar flowtype</h2>
+        <p class="text-sm text-fgsoft mt-3 max-w-md mx-auto">
+          Instalador NSIS .exe ou .zip portable. Sem code signing — Windows pode mostrar SmartScreen warning na primeira execução.
+        </p>
+
+        <a href="#" class="inline-flex items-center gap-3 mt-8 px-8 py-4 rounded-xl bg-accent text-bg0 hover:bg-accent2 text-sm font-semibold shadow-glowStrong">
+          <span class="text-lg">⤓</span>
+          <span>flowtype-setup-v0.1.0.exe</span>
+          <span class="text-[10px] opacity-70 font-mono">180 MB</span>
+        </a>
+
+        <div class="mt-6 flex items-center justify-center gap-4 text-xs text-muted">
+          <a href="#" class="hover:text-accent flex items-center gap-1">⤓ .zip portable</a>
+          <span class="text-faint">·</span>
+          <a href="#" class="hover:text-accent">checksums.txt</a>
+        </div>
+
+        <div class="mt-6 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bg0 border border-border text-[10px] font-mono text-muted">
+          <span class="text-faint">SHA256</span>
+          <span class="text-fgsoft">a3f1c9b2…7d4e8a09</span>
+          <button class="text-accent hover:text-accent2">⎘ copiar</button>
+        </div>
+
+        <p class="text-[10px] text-faint font-mono mt-4">Requer Windows 10 ou superior · 200MB livre</p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="max-w-3xl mx-auto px-6 py-20">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-semibold tracking-tight">Perguntas frequentes</h2>
+      </div>
+
+      <div class="space-y-2">
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>flowtype envia minha voz pra algum servidor?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Por default, áudio é enviado pra Groq (cloud) pra transcrição rápida. Você pode ativar "Forçar fallback local" nas Settings — aí tudo roda offline via faster-whisper bundled, áudio nunca sai da sua máquina.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Groq é mesmo gratuito? Tem limite?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Sim. Free tier do Groq dá 14.400 requests/dia por key. Como o flowtype suporta até 3 keys em pool, você pode chegar a 43.200 req/dia — mais que suficiente pra uso intenso. Quando estoura, cai automaticamente pro local.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Quais requisitos de hardware?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Windows 10+, 2GB RAM livre. Pra fallback local funcionar bem, recomendado 4 cores e 4GB RAM (modelo small.en consome ~2GB enquanto roda).
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Por que o Windows mostra "SmartScreen warning"?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            v0.1 não tem code signing (certificado EV custa $300+/ano). Clique "Mais informações" → "Executar mesmo assim". Vamos resolver isso em versão futura.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Quando sai pra Mac/Linux?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            v0.1 é Windows-first. Mac (com a nova permission model do System Events) e Linux (X11+Wayland separados) estão no roadmap pra v0.3.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Como funciona o vocabulário custom?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Você cadastra pares "term_wrong → term_correct" nas Settings. Pós-transcrição, antes de colar, flowtype substitui. Útil pra nomes próprios (Kunha → Cunha), siglas técnicas, jargões específicos do seu trabalho.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Funciona offline?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Sim. Sem internet, cai automaticamente pro faster-whisper local (modelo small.en bundled, ~140MB). Latência sobe pra ~3s mas funciona.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Onde está o código fonte?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            MIT license. Repositório em github.com/[…]/flowtype. PRs e issues bem-vindos.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Coleta algum telemetry?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Não por default. Telemetria é opt-in (Settings → Privacidade) e mesmo ativada só registra contadores agregados (req count, latency p50), nunca conteúdo de transcrição.
+          </div>
+        </details>
+
+        <details class="rounded-lg bg-bg2 border border-border group">
+          <summary class="cursor-pointer p-4 flex items-center justify-between text-sm font-medium hover:bg-surface">
+            <span>Como contato suporte?</span>
+            <span class="text-muted text-xs group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div class="px-4 pb-4 text-xs text-fgsoft leading-relaxed">
+            Abra uma issue no GitHub (preferencial — outros podem se beneficiar) ou email <code class="font-mono text-accent">support@flowtype.app</code>.
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-border bg-bg0 mt-20">
+      <div class="max-w-6xl mx-auto px-6 py-10 grid md:grid-cols-4 gap-6">
+        <div>
+          <div class="flex items-center gap-2.5 mb-3">
+            <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-bg0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+            </div>
+            <span class="text-sm font-semibold">flowtype</span>
+          </div>
+          <p class="text-xs text-muted leading-relaxed">Sua voz vira texto onde você estiver.</p>
+        </div>
+
+        <div>
+          <div class="text-[10px] font-mono uppercase tracking-wider text-faint mb-3">Produto</div>
+          <ul class="space-y-2 text-xs text-fgsoft">
+            <li><a href="#download" class="hover:text-accent">Download</a></li>
+            <li><a href="#features" class="hover:text-accent">Features</a></li>
+            <li><a href="#faq" class="hover:text-accent">FAQ</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="text-[10px] font-mono uppercase tracking-wider text-faint mb-3">Recursos</div>
+          <ul class="space-y-2 text-xs text-fgsoft">
+            <li><a href="#" class="hover:text-accent">GitHub ↗</a></li>
+            <li><a href="#" class="hover:text-accent">Changelog</a></li>
+            <li><a href="#" class="hover:text-accent">Privacy policy</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="text-[10px] font-mono uppercase tracking-wider text-faint mb-3">Contato</div>
+          <ul class="space-y-2 text-xs text-fgsoft">
+            <li><a href="#" class="hover:text-accent">support@flowtype.app</a></li>
+            <li><a href="#" class="hover:text-accent">@flowtypeapp</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-border">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-2 text-[10px] font-mono text-faint">
+          <span>© 2026 flowtype · MIT license</span>
+          <span class="text-accent/60">Made for human voice.</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SCRIPTS                                                -->
+<!-- ====================================================== -->
+<script>
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    const v = document.getElementById('view-' + name);
+    if (v) v.classList.add('active');
+    const btn = Array.from(document.querySelectorAll('.nav-btn'))
+      .find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + name + "'"));
+    if (btn) btn.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  let currentStep = 1;
+  function showStep(n) {
+    currentStep = n;
+    document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+    const step = document.getElementById('wstep-' + n);
+    if (step) step.classList.add('active');
+
+    const dots = document.querySelectorAll('.wizard-dots .wizard-dot');
+    dots.forEach((d, i) => {
+      d.classList.remove('active', 'done');
+      if (i + 1 < n) d.classList.add('done');
+      if (i + 1 === n) d.classList.add('active');
+    });
+
+    document.getElementById('step-label').textContent = 'Passo ' + n + ' de 4';
+    document.getElementById('btn-back').style.opacity = (n === 1) ? '0.3' : '1';
+    document.getElementById('btn-back').style.pointerEvents = (n === 1) ? 'none' : 'auto';
+    const btnNext = document.getElementById('btn-next');
+    btnNext.textContent = (n === 4) ? 'Concluir ✓' : 'Próximo →';
+  }
+  function nextStep() { if (currentStep < 4) showStep(currentStep + 1); }
+  function prevStep() { if (currentStep > 1) showStep(currentStep - 1); }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Flow Type — sua voz vira texto onde você estiver">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060708"/>
+      <stop offset="100%" stop-color="#0c0e11"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="0%" r="60%">
+      <stop offset="0%" stop-color="#5FE6FF" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#5FE6FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5FE6FF"/>
+      <stop offset="100%" stop-color="#B8FFEE"/>
+    </linearGradient>
+    <linearGradient id="logoG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5FE6FF"/>
+      <stop offset="100%" stop-color="#B8FFEE"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- pill -->
+  <g transform="translate(440 110)">
+    <rect width="320" height="42" rx="21" fill="#14171c" stroke="#5FE6FF" stroke-opacity="0.3"/>
+    <circle cx="22" cy="21" r="4" fill="#5FE6FF"/>
+    <text x="38" y="28" font-family="ui-monospace, monospace" font-size="14" fill="#5FE6FF">v0.1 · Windows · 100% free</text>
+  </g>
+
+  <!-- h1 -->
+  <g transform="translate(600 280)" text-anchor="middle">
+    <text font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="72" fill="#E8ECEF">sua voz vira texto</text>
+    <text y="84" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="72" fill="url(#brand)">onde você estiver</text>
+  </g>
+
+  <!-- subtitle -->
+  <g transform="translate(600 460)" text-anchor="middle">
+    <text font-family="Inter, system-ui, sans-serif" font-size="22" fill="#B5BCC4">
+      Segure Right Ctrl, fale, solta. Em menos de 1 segundo o texto aparece no campo ativo.
+    </text>
+  </g>
+
+  <!-- logo bottom-left -->
+  <g transform="translate(60 540)">
+    <rect width="44" height="44" rx="10" fill="url(#logoG)"/>
+    <path d="M9 22h6l4-13 5 26 4-13h6" fill="none" stroke="#051820" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="60" y="30" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="22" fill="#E8ECEF">Flow Type</text>
+    <text x="60" y="52" font-family="ui-monospace, monospace" font-size="13" fill="#7C8590">flowtype.app</text>
+  </g>
+
+  <!-- waveform decoration bottom-right -->
+  <g transform="translate(960 540)">
+    <rect x="0"  y="14" width="4" height="20" rx="2" fill="#5FE6FF" opacity="0.85"/>
+    <rect x="10" y="6"  width="4" height="36" rx="2" fill="#5FE6FF" opacity="0.7"/>
+    <rect x="20" y="18" width="4" height="12" rx="2" fill="#5FE6FF" opacity="0.85"/>
+    <rect x="30" y="0"  width="4" height="48" rx="2" fill="#5FE6FF"/>
+    <rect x="40" y="10" width="4" height="28" rx="2" fill="#5FE6FF" opacity="0.7"/>
+    <rect x="50" y="20" width="4" height="8"  rx="2" fill="#5FE6FF" opacity="0.85"/>
+    <rect x="60" y="4"  width="4" height="40" rx="2" fill="#5FE6FF" opacity="0.7"/>
+    <rect x="70" y="14" width="4" height="20" rx="2" fill="#5FE6FF" opacity="0.85"/>
+    <text x="100" y="30" font-family="ui-monospace, monospace" font-size="16" fill="#5FE6FF">→ p50 720ms</text>
+  </g>
+</svg>

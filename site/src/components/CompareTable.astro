@@ -1,0 +1,48 @@
+---
+import Icon from "./icons/Icon.astro";
+
+const pillars = [
+  {
+    icon: "bolt",
+    title: "Free, sem cap de uso",
+    body: "Use o quanto quiser. Groq Whisper Large v3 Turbo sub-1s na nuvem + faster-whisper local pra offline. Sem trial, sem cobrança recorrente, sem limite de minutos.",
+  },
+  {
+    icon: "globe",
+    title: "Funciona em qualquer app",
+    body: "Clipboard paste universal: Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, Slack, qualquer campo de texto. Whitelist/blacklist por app pra controle fino.",
+  },
+  {
+    icon: "shield",
+    title: "Privacy-aware",
+    body: "Toggle 'modo local-only' nas settings: áudio NUNCA sai da máquina. faster-whisper roda 100% offline. Histórico fica em SQLite local.",
+  },
+];
+---
+
+<section id="why" class="scroll-mt-24" aria-labelledby="why-h2">
+  <div class="max-w-5xl mx-auto px-6 py-16 sm:py-20">
+    <div class="text-center mb-12">
+      <h2 id="why-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">
+        Por que <span class="text-accent">Flow Type</span>
+      </h2>
+      <p class="text-sm text-muted mt-3 max-w-xl mx-auto">
+        Dictation universal sem fricção e sem assinatura.
+      </p>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4">
+      {
+        pillars.map((p) => (
+          <article class="surface-card p-6">
+            <div class="w-10 h-10 rounded-lg bg-accent/10 border border-accent/30 flex items-center justify-center mb-4">
+              <Icon name={p.icon} size={18} class="text-accent" />
+            </div>
+            <h3 class="text-base font-semibold tracking-tight mb-2">{p.title}</h3>
+            <p class="text-sm text-fg-soft leading-relaxed">{p.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
