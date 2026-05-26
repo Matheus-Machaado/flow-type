@@ -1,6 +1,6 @@
 {
   "name": "flowtype",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Dictation universal Windows — voice to text in any app, no token limits",
   "main": "./out/main/index.js",
   "author": "Matheus Machado",

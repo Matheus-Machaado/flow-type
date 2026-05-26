@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Capturing state: 7-bar waveform reactive to mic input level.
- * If a `volumeRms` value flows in through props (set by WO-2 mic pipeline),
- * we render real-time. Otherwise we fall back to a synthetic animation so the
- * shape never goes flat — better DX during WO-1 isolated testing.
+ * Capturing state: 7-bar waveform driven by the REAL mic RMS.
+ *
+ * NÃO há animação cenográfica: quando o microfone está mudo, desconectado,
+ * ou sem permissão, `volumeRms` fica em 0 e as barras achatam no piso
+ * (3 px). Isso é intencional — o usuário precisa identificar imediatamente
+ * que algo está errado com o áudio. Visual "decorativo" que parece áudio
+ * sem ser áudio engana o user; preferimos a barra morta + cor de silêncio.
  *
  * Duration counter ticks once per 100ms.
  */
+const BAR_COUNT = 7
+const BAR_MIN_PX = 3
+const BAR_MAX_PX = 24
+// Pesos por barra criam um pico central (look de waveform real),
+// sem inventar dados — só distribui a energia medida.
+const BAR_WEIGHTS = [0.55, 0.78, 0.92, 1, 0.92, 0.78, 0.55]
+
 export function CapturingWaveform({
   volumeRms,
   startedAt
@@ -15,11 +25,11 @@ export function CapturingWaveform({
   volumeRms?: number
   startedAt: number
 }): JSX.Element {
-  const [bars, setBars] = useState<number[]>(() => new Array(7).fill(4))
+  const [bars, setBars] = useState<number[]>(() => new Array(BAR_COUNT).fill(BAR_MIN_PX))
   const [elapsed, setElapsed] = useState(0)
   const rafRef = useRef<number | null>(null)
-  const lastTickRef = useRef<number>(performance.now())
 
+  // Counter (1 update / 100ms)
   useEffect(() => {
     const id = setInterval(() => {
       setElapsed(Math.max(0, Date.now() - startedAt))
@@ -27,43 +37,45 @@ export function CapturingWaveform({
     return () => clearInterval(id)
   }, [startedAt])
 
+  // Bar heights follow live RMS. Sem random, sem sin. RMS=0 → todas no piso.
   useEffect(() => {
-    function tick(): void {
-      const now = performance.now()
-      if (now - lastTickRef.current >= 60) {
-        lastTickRef.current = now
-        const baseline = typeof volumeRms === 'number' ? Math.min(1, Math.max(0, volumeRms)) : 0
-        setBars((prev) =>
-          prev.map((_, i) => {
-            // jitter centered around the rms baseline (or a soft synthetic sin).
-            const synth = baseline > 0
-              ? baseline
-              : 0.25 + 0.25 * Math.sin(now / 220 + i * 0.7)
-            const noise = Math.random() * 0.35
-            const height = 4 + Math.floor((synth + noise) * 20) // 4..28
-            return Math.min(28, Math.max(4, height))
-          })
-        )
-      }
+    const tick = (): void => {
+      const v = typeof volumeRms === 'number' ? Math.min(1, Math.max(0, volumeRms)) : 0
+      setBars(
+        BAR_WEIGHTS.map((w) => {
+          const h = BAR_MIN_PX + Math.round(v * w * (BAR_MAX_PX - BAR_MIN_PX))
+          return Math.max(BAR_MIN_PX, Math.min(BAR_MAX_PX, h))
+        })
+      )
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
     }
   }, [volumeRms])
 
   const seconds = (elapsed / 1000).toFixed(1)
+  // Threshold pequeno pra não pintar de cinza por ruído de fundo natural.
+  const isSilent = (volumeRms ?? 0) < 0.02
 
   return (
     <div className="flex items-center gap-3" aria-live="polite">
-      <div className="flex items-end gap-[3px] h-6">
+      <div
+        className="flex items-end gap-[3px]"
+        style={{ height: BAR_MAX_PX }}
+        aria-label={isSilent ? 'Microfone sem sinal' : 'Capturando voz'}
+      >
         {bars.map((h, i) => (
           <span
             key={i}
             aria-hidden
-            className="w-[3px] rounded-sm bg-accent shadow-glow"
-            style={{ height: `${h}px` }}
+            className={
+              isSilent
+                ? 'w-[3px] rounded-sm bg-text-faint'
+                : 'w-[3px] rounded-sm bg-accent shadow-glow'
+            }
+            style={{ height: `${h}px`, transition: 'height 60ms linear' }}
           />
         ))}
       </div>

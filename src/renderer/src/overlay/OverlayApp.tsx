@@ -28,6 +28,15 @@ export function OverlayApp(): JSX.Element {
   const chunksRef = useRef<Blob[]>([])
   const recordStartedAtRef = useRef<number>(0)
 
+  // Live mic level (0..1). Drives CapturingWaveform — não há fallback fake.
+  // Quando o mic está mudo/desconectado, fica em 0 e a waveform achata,
+  // permitindo o usuário identificar que algo está errado.
+  const [volumeRms, setVolumeRms] = useState<number>(0)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const rmsRafRef = useRef<number | null>(null)
+
   // Query-string override for isolated testing (no Electron required).
   const queryState = useMemo<OverlayStatePayload['state'] | null>(() => {
     if (typeof window === 'undefined') return null
@@ -85,6 +94,50 @@ export function OverlayApp(): JSX.Element {
         recorder.start(100) // emit chunks every 100ms; covers short holds
         recorderRef.current = recorder
         recordStartedAtRef.current = Date.now()
+
+        // Real mic-level meter: AnalyserNode reads PCM directly from the
+        // MediaStream and computes RMS per frame. Drives the waveform UI.
+        try {
+          // Lazy-create AudioContext on first interaction (autoplay-safe).
+          if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+            const Ctor =
+              (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext })
+                .AudioContext ??
+              (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+            audioCtxRef.current = new Ctor()
+          }
+          if (audioCtxRef.current.state === 'suspended') {
+            await audioCtxRef.current.resume()
+          }
+          const source = audioCtxRef.current.createMediaStreamSource(stream)
+          sourceRef.current = source
+          const analyser = audioCtxRef.current.createAnalyser()
+          analyser.fftSize = 512
+          analyser.smoothingTimeConstant = 0.4
+          source.connect(analyser)
+          analyserRef.current = analyser
+
+          const data = new Uint8Array(analyser.fftSize)
+          const tick = (): void => {
+            if (!analyserRef.current) return
+            analyserRef.current.getByteTimeDomainData(data)
+            // RMS of the signal (deviation from 128 = silence midpoint).
+            let sumSq = 0
+            for (let i = 0; i < data.length; i++) {
+              const v = (data[i] - 128) / 128 // -1..1
+              sumSq += v * v
+            }
+            const rms = Math.sqrt(sumSq / data.length) // 0..1 typically peaks ~0.3 for normal voice
+            // Boost so normal voice fills the bars; clamp 0..1.
+            const normalized = Math.min(1, rms * 3.2)
+            setVolumeRms(normalized)
+            rmsRafRef.current = requestAnimationFrame(tick)
+          }
+          rmsRafRef.current = requestAnimationFrame(tick)
+        } catch (err) {
+          console.warn('[overlay] RMS meter init failed (non-fatal)', err)
+        }
+
         // Local visual transition to capturing as soon as we're actually recording.
         setState({ state: 'capturing' })
         setCapturingStartedAt(Date.now())
@@ -137,6 +190,18 @@ export function OverlayApp(): JSX.Element {
     }
 
     const cleanupRecording = (): void => {
+      if (rmsRafRef.current != null) {
+        cancelAnimationFrame(rmsRafRef.current)
+        rmsRafRef.current = null
+      }
+      try {
+        sourceRef.current?.disconnect()
+      } catch {
+        // ignore
+      }
+      sourceRef.current = null
+      analyserRef.current = null
+      // AudioContext fica vivo entre gravações (reuso é OK). Só limpa stream.
       try {
         streamRef.current?.getTracks().forEach((t) => t.stop())
       } catch {
@@ -145,6 +210,7 @@ export function OverlayApp(): JSX.Element {
       streamRef.current = null
       recorderRef.current = null
       chunksRef.current = []
+      setVolumeRms(0)
     }
 
     const unsubArmed = bridge.onHotkeyArmed?.(() => {
@@ -183,7 +249,7 @@ export function OverlayApp(): JSX.Element {
           className="overlay-drag-handle absolute top-0 left-0 right-0 h-1/2 pointer-events-auto"
           aria-hidden="true"
         />
-        <StateView state={state} startedAt={capturingStartedAt} />
+        <StateView state={state} startedAt={capturingStartedAt} liveRms={volumeRms} />
         {badge ? <Badge badge={badge} /> : null}
       </div>
     </div>
@@ -192,16 +258,20 @@ export function OverlayApp(): JSX.Element {
 
 function StateView({
   state,
-  startedAt
+  startedAt,
+  liveRms
 }: {
   state: OverlayStatePayload
   startedAt: number
+  liveRms: number
 }): JSX.Element {
   switch (state.state) {
     case 'armed':
       return <ArmedPulse />
     case 'capturing':
-      return <CapturingWaveform volumeRms={state.meta?.volumeRms} startedAt={startedAt} />
+      // liveRms = nível real do mic (0..1). Sem fallback fake — se está 0,
+      // a waveform achata e o usuário vê que o mic não está captando.
+      return <CapturingWaveform volumeRms={liveRms} startedAt={startedAt} />
     case 'processing':
       return <ProcessingSpinner label={state.meta?.label} />
     case 'idle':
