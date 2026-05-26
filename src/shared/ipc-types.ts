@@ -167,6 +167,10 @@ export const Channels = {
   AppActiveWindowDetectOnce: 'app:active-window-detect-once',
   AppOnboardingStatus: 'app:onboarding-status',
 
+  // STT — orchestrated full pipeline (hotkey → record → transcribe → vocab → inject → history)
+  // Sent from overlay renderer to main with audio buffer; main returns when injection finishes.
+  SttTranscribeAndInject: 'stt:transcribe-and-inject',
+
   // Text injection (WO-3)
   TextInjectionPaste: 'text-injection:paste',
   TextInjectionResult: 'text-injection:result',

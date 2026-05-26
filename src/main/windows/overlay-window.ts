@@ -68,7 +68,7 @@ export function createOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     focusable: false,
     resizable: false,
-    movable: false,
+    movable: true,
     hasShadow: false,
     fullscreenable: false,
     backgroundColor: '#00000000',
@@ -101,6 +101,21 @@ export function createOverlayWindow(): BrowserWindow {
   screen.on('display-metrics-changed', repositionOverlay)
   screen.on('display-added', repositionOverlay)
   screen.on('display-removed', repositionOverlay)
+
+  // Persist user-drag position: switch setting to 'custom' and remember xy.
+  // Debounce to once per move-stop event.
+  let moveTimer: NodeJS.Timeout | null = null
+  overlayWindow.on('moved', () => {
+    if (moveTimer) clearTimeout(moveTimer)
+    moveTimer = setTimeout(() => {
+      const win = getOverlayWindow()
+      if (!win) return
+      const bounds = win.getBounds()
+      settings.set('overlay_position', 'custom')
+      settings.set('overlay_custom_xy', [bounds.x, bounds.y])
+      log.debug('overlay position persisted via drag', { x: bounds.x, y: bounds.y })
+    }, 250)
+  })
 
   log.info('overlay-window created', { x, y, pos })
   return overlayWindow

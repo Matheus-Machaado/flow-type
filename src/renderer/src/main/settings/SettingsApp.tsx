@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { cn } from '../../shared/lib/cn'
 import { getBridge } from '../../shared/hooks/useBridge'
+import { SectionIcon, type SectionIconName } from '../../shared/components/icons/SectionIcon'
 import { HotkeySection } from './sections/HotkeySection'
 import { MicrofoneSection } from './sections/MicrofoneSection'
 import { GroqProviderSection } from './sections/GroqProviderSection'
@@ -31,7 +32,7 @@ type SectionId =
 interface SectionMeta {
   id: SectionId
   label: string
-  icon: string
+  icon: SectionIconName
   description: string
 }
 
@@ -39,43 +40,43 @@ const SECTIONS: SectionMeta[] = [
   {
     id: 'hotkey',
     label: 'Hotkey',
-    icon: '⌨',
+    icon: 'keyboard',
     description: 'Tecla que arma a captura de voz.'
   },
   {
     id: 'microfone',
     label: 'Microfone',
-    icon: '🎙',
+    icon: 'mic',
     description: 'Dispositivo de captura de áudio.'
   },
   {
     id: 'stt',
     label: 'STT Provider',
-    icon: '☁',
+    icon: 'cloud',
     description: 'Provedor de transcrição (cloud + fallback local).'
   },
   {
     id: 'idioma',
     label: 'Idioma',
-    icon: '🌐',
+    icon: 'globe',
     description: 'Idioma do áudio.'
   },
   {
     id: 'vocab',
     label: 'Vocabulário',
-    icon: '📚',
+    icon: 'book',
     description: 'Correções aplicadas após a transcrição.'
   },
   {
     id: 'autostart',
     label: 'Auto-start',
-    icon: '⚡',
+    icon: 'zap',
     description: 'Iniciar com o Windows.'
   },
   {
     id: 'sobre',
     label: 'Sobre',
-    icon: 'ⓘ',
+    icon: 'info',
     description: 'Versão e links.'
   }
 ]
@@ -156,8 +157,8 @@ function Sidebar({
               : 'text-text-muted hover:bg-bg-2 hover:text-text-secondary border border-transparent'
           )}
         >
-          <span aria-hidden className="w-4 text-center">
-            {s.icon}
+          <span className="w-4 flex items-center justify-center text-current">
+            <SectionIcon name={s.icon} size={15} />
           </span>
           <span>{s.label}</span>
         </button>

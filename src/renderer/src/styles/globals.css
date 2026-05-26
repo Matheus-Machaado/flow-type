@@ -64,6 +64,25 @@
   height: 100vh;
 }
 
+/* Drag handle area inside overlay — user can grab the top portion to move
+   the window. Bottom portion stays non-draggable so hover/click events
+   reach the underlying state component. */
+.overlay-drag-handle {
+  -webkit-app-region: drag;
+  app-region: drag;
+  cursor: grab;
+}
+.overlay-drag-handle:active {
+  cursor: grabbing;
+}
+/* Buttons / interactive children inside dragged areas must opt out. */
+.overlay-root button,
+.overlay-root a,
+.overlay-root [role='status'] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* ── Selection (cyan tint) ────────────────────────────────────────── */
 ::selection {
   background: rgba(95, 230, 255, 0.25);

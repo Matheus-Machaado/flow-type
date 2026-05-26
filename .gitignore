@@ -37,6 +37,11 @@ site/node_modules/
 site/lighthouse-report.json
 site/lighthouse-report.html
 
+# Binary downloads (hospedados no Netlify + GitHub Releases; não no git tree)
+site/public/download/*.exe
+site/public/download/*.zip
+site/public/download/checksums.txt
+
 # Local-only worktrees (so-testar mission infra)
 .worktrees/
 

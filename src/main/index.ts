@@ -1,11 +1,16 @@
 /**
  * flowtype main process entry. Wires the modules: window-state, settings,
- * overlay, main window, tray, hotkey, IPC handlers, auto-start. Boots either
- * in autostart-hidden mode (--autostart flag) or normal mode.
+ * overlay, main window, tray, hotkey, IPC handlers, auto-start, and the
+ * full hotkey → record → STT → vocab → inject → history pipeline.
+ *
+ * v0.1.1: full integration. Overlay records audio while hotkey is held,
+ * sends the buffer to main on release, main runs SttGateway whose
+ * onTranscribed hook chains text injection + history persistence + badge.
  */
 
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { createLogger, getLogFilePath } from '@shared/logger'
+import { Channels } from '@shared/ipc-types'
 
 import * as settings from './state/settings-store'
 import { createMainWindow } from './windows/main-window'
@@ -24,12 +29,16 @@ import { setAutoStart, isAutoStartEnabled, startedFromLogin } from './auto-start
 // module failure (better-sqlite3 / uIOhook / nut-js) cannot prevent the
 // renderer from coming up. Each subsystem is best-effort.
 import { bootDb, type BootDbResult } from './db/index.js'
-import { buildSttStack } from './stt/index.js'
-import { buildInjectionStack } from './injection/index.js'
+import { buildSttStack, type SttStack } from './stt/index.js'
+import { buildInjectionStack, type InjectionStack } from './injection/index.js'
 import { registerHistoryIpcHandlers } from './ipc/history-handlers.js'
 import { registerVocabIpcHandlers } from './ipc/vocab-handlers.js'
 import { registerSttIpcHandlers } from './ipc/stt-handlers.js'
 import { registerInjectionIpcHandlers } from './ipc/injection-handlers.js'
+import { audioPathFor } from './utils/audio-path.js'
+import { newId as newUlid } from './utils/ulid.js'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 const log = createLogger('main')
 
@@ -77,45 +86,39 @@ app.whenReady().then(async () => {
   // Wire backend stacks (best-effort — see wireBackend() doc).
   wireBackend()
 
-  const startHidden = startedFromLogin()
-
   // Always create overlay + tray; main window may stay hidden.
   createOverlayWindow()
   createTray()
-  createMainWindow({ startHidden: true }) // creates but doesn't show
+  createMainWindow({ startHidden: true })
 
-  if (!startHidden) {
-    // Main window stays hidden on boot (WO-1 spec). Showing happens via tray
-    // or `app:show-main` IPC. Only autostart explicitly bypasses splash, but
-    // the hidden-by-default rule is the same either way.
-    // We keep it created so it can be revealed cheaply on first tray click.
-  }
-
-  // Wire hotkey → overlay state + broadcasts. Skipped under E2E
-  // (`FLOWTYPE_DISABLE_HOTKEY=1`) so test runs don't hijack the host's
-  // Right Ctrl key.
+  // Wire hotkey → broadcast events to ALL windows (overlay drives recording).
+  // Skipped under E2E (`FLOWTYPE_DISABLE_HOTKEY=1`) so test runs don't hijack
+  // the host's Right Ctrl key.
   if (process.env.FLOWTYPE_DISABLE_HOTKEY === '1') {
     log.info('hotkey manager disabled via FLOWTYPE_DISABLE_HOTKEY')
   } else {
-  hotkeyManager.init({
-    onArmed: () => {
-      if (settings.get('muted') || isPaused()) {
-        log.debug('hotkey armed ignored (muted or paused)')
-        return
+    hotkeyManager.init({
+      onArmed: () => {
+        if (settings.get('muted') || isPaused()) {
+          log.debug('hotkey armed ignored (muted or paused)')
+          return
+        }
+        // Visual: overlay → armed (animation only; recording starts on overlay
+        // when it sees hotkey:armed).
+        broadcastOverlayState({ state: 'armed' })
+        broadcastHotkeyArmed({ hwndSnapshot: null })
+      },
+      onReleased: ({ holdDurationMs }) => {
+        if (settings.get('muted') || isPaused()) return
+        // Visual: overlay → processing (overlay flips to processing right
+        // after stopping its MediaRecorder, before the audio buffer arrives).
+        // Broadcasting here makes the transition feel instant from the user's
+        // POV even if the overlay's own state update lags a tick.
+        broadcastOverlayState({ state: 'processing', meta: { label: 'transcrevendo…' } })
+        broadcastHotkeyReleased({ holdDurationMs, hwndSnapshot: null })
       }
-      broadcastOverlayState({ state: 'armed' })
-      // hwndSnapshot is null in WO-1 — WO-3 fills it via PowerShell.
-      broadcastHotkeyArmed({ hwndSnapshot: null })
-    },
-    onReleased: ({ holdDurationMs }) => {
-      if (settings.get('muted') || isPaused()) return
-      // WO-1 doesn't run STT — we just return to idle. WO-2 will set the
-      // overlay to 'processing' until the cascade completes.
-      broadcastOverlayState({ state: 'idle' })
-      broadcastHotkeyReleased({ holdDurationMs, hwndSnapshot: null })
-    }
-  })
-  } // /FLOWTYPE_DISABLE_HOTKEY guard
+    })
+  }
 
   log.info('flowtype boot complete', {
     hotkeyMode:
@@ -124,10 +127,8 @@ app.whenReady().then(async () => {
 })
 
 // On Windows, closing the last visible window must NOT quit the app — we
-// keep running in the tray. The tray "Sair" item is the only legitimate
-// quit path.
+// keep running in the tray.
 app.on('window-all-closed', () => {
-  // intentionally a no-op on Windows; on macOS we'd also keep going.
   log.debug('window-all-closed event ignored — staying alive in tray')
 })
 
@@ -149,13 +150,16 @@ process.on('unhandledRejection', (reason) => {
   log.error('unhandledRejection', { reason: String(reason) })
 })
 
-/**
- * Wire WO-2/3/4/6 IPC handlers. Each step is independently guarded — if
- * better-sqlite3 fails to load (e.g. Node ABI mismatch in CI), the UI still
- * boots and the user sees friendly "feature unavailable" states instead of
- * a crashed Electron process.
- */
-let backendBoot: { db?: BootDbResult } = {}
+// ─────────────────────────────────────────────────────────────────────────
+// Backend wiring
+// ─────────────────────────────────────────────────────────────────────────
+
+let backendBoot: {
+  db?: BootDbResult
+  stt?: SttStack
+  injection?: InjectionStack
+} = {}
+
 function wireBackend(): void {
   try {
     const boot = bootDb()
@@ -173,32 +177,16 @@ function wireBackend(): void {
       log.error('vocab-handlers registration failed', { error: String(e) })
     }
 
-    // STT stack — Groq pool + provider + faster-whisper. No native deps here
-    // beyond what better-sqlite3 already imposed.
-    try {
-      const stt = buildSttStack(
-        boot.groqSlotMetaRepo,
-        boot.tokenUsageRepo,
-        boot.settingsRepo
-      )
-      registerSttIpcHandlers({
-        pool: stt.pool,
-        gateway: stt.gateway,
-        settings: boot.settingsRepo
-      })
-      log.info('STT stack wired')
-    } catch (e) {
-      log.error('STT stack wiring failed', { error: String(e) })
-    }
-
-    // Injection stack — pulls in nut.js (native). Failure here only disables
-    // paste; user can still review history and adjust settings. Skipped
-    // under FLOWTYPE_DISABLE_INJECTION=1 for E2E runs.
+    // Injection stack BEFORE STT so the gateway's onTranscribed hook can
+    // call injector.paste() and persist via transcriptionRepo.insert().
+    // Skipped under FLOWTYPE_DISABLE_INJECTION=1 for E2E runs.
+    let injection: InjectionStack | undefined
     if (process.env.FLOWTYPE_DISABLE_INJECTION === '1') {
       log.info('Injection stack skipped via FLOWTYPE_DISABLE_INJECTION')
     } else {
       try {
-        const injection = buildInjectionStack(boot.settingsRepo)
+        injection = buildInjectionStack(boot.settingsRepo)
+        backendBoot.injection = injection
         registerInjectionIpcHandlers({
           injector: injection.injector,
           detector: injection.detector
@@ -207,6 +195,162 @@ function wireBackend(): void {
       } catch (e) {
         log.error('Injection stack wiring failed', { error: String(e) })
       }
+    }
+
+    // STT stack — with onTranscribed hook bound to injector + transcription
+    // repo + overlay badge. This is the integration glue that v0.1.0 missed.
+    try {
+      const stt = buildSttStack(
+        boot.groqSlotMetaRepo,
+        boot.tokenUsageRepo,
+        boot.settingsRepo,
+        {
+          gatewayOptions: {
+            vocabRepo: boot.vocabRepo,
+            resolveActiveExe: () => {
+              // v0.1.1: returns undefined → vocab uses global scope only.
+              // Per-app scope requires sync access to the detector cache;
+              // ActiveWindowDetector currently exposes only async. Will be
+              // wired in v0.1.2 once detector gets a sync `getLastKnownExe()`.
+              return undefined
+            },
+            broadcastBadge: (badgeEvent) => {
+              for (const w of BrowserWindow.getAllWindows()) {
+                if (w.isDestroyed()) continue
+                w.webContents.send(Channels.OverlayShowBadge, {
+                  kind: badgeEvent.kind,
+                  slotIndex: badgeEvent.slotIndex,
+                  slotLabel: badgeEvent.slotLabel,
+                  latencyMs: badgeEvent.latencyMs,
+                  ttlMs: badgeEvent.ttlMs ?? 1500
+                })
+              }
+            },
+            onTranscribed: async (result, _ctx) => {
+              // Skip empty or whitespace-only transcripts (hold-too-short etc).
+              const text = (result.text ?? '').trim()
+              if (!text) {
+                log.info('transcribe: empty text, skipping inject + history')
+                broadcastOverlayState({ state: 'idle' })
+                return
+              }
+              let pasteResult:
+                | Awaited<ReturnType<NonNullable<typeof injection>['injector']['paste']>>
+                | null = null
+              let pasteError: string | null = null
+              if (injection) {
+                try {
+                  pasteResult = await injection.injector.paste(text)
+                } catch (e) {
+                  pasteError = (e as Error).message
+                  log.error('text-injection paste failed', { error: pasteError })
+                }
+              }
+              try {
+                const rawApplied =
+                  (result as unknown as {
+                    vocab_corrections_applied?: Array<{
+                      id: string
+                      term_wrong: string
+                      term_correct: string
+                      count: number
+                    }>
+                  }).vocab_corrections_applied ?? []
+                // Map gateway's VocabApplied → repo's VocabCorrectionApplied shape.
+                const vocabApplied = rawApplied.map((v) => ({
+                  wrong: v.term_wrong,
+                  correct: v.term_correct,
+                  scope: 'global'
+                }))
+                const pasteMethod =
+                  pasteResult?.method === 'clipboard' || pasteResult?.method === 'typing'
+                    ? pasteResult.method
+                    : undefined
+                boot.transcriptionRepo.insert({
+                  text,
+                  audio_path: null,
+                  app_exe: pasteResult?.targetWindow?.exeName ?? null,
+                  app_window_title: pasteResult?.targetWindow?.windowTitle ?? null,
+                  provider_used: result.provider,
+                  slot_index: result.slotIndex ?? null,
+                  slot_label: result.slotLabel ?? null,
+                  latency_ms: Math.round(result.latencyMs ?? 0),
+                  language: result.language ?? null,
+                  vocab_corrections_applied: vocabApplied,
+                  paste_method: pasteMethod,
+                  paste_succeeded: pasteResult?.success ?? false,
+                  target_window_lost_focus: pasteResult?.refocused ?? false
+                })
+              } catch (e) {
+                log.error('transcription_repo.insert failed', { error: (e as Error).message })
+              }
+              if (pasteError) {
+                log.warn('paste failed; transcription saved without inject', { pasteError })
+              }
+              // Final overlay state — back to idle. Badge fades on its own.
+              broadcastOverlayState({ state: 'idle' })
+            }
+          }
+        }
+      )
+      backendBoot.stt = stt
+      registerSttIpcHandlers({
+        pool: stt.pool,
+        gateway: stt.gateway,
+        settings: boot.settingsRepo
+      })
+      log.info('STT stack wired')
+
+      // The orchestrator: overlay → main with audio buffer → full pipeline.
+      ipcMain.handle(
+        Channels.SttTranscribeAndInject,
+        async (
+          _e,
+          payload: { audioBuffer: ArrayBuffer; durationMs: number }
+        ): Promise<{
+          ok: boolean
+          error?: string
+          text?: string
+          provider?: 'groq' | 'local'
+          latencyMs?: number
+        }> => {
+          try {
+            if (!payload?.audioBuffer || payload.audioBuffer.byteLength < 1024) {
+              log.info('transcribe-and-inject: audio too small, skipping', {
+                bytes: payload?.audioBuffer?.byteLength ?? 0
+              })
+              broadcastOverlayState({ state: 'idle' })
+              return { ok: false, error: 'audio-too-small' }
+            }
+            // Persist audio as artifact (best-effort — caller doesn't depend).
+            try {
+              const id = newUlid()
+              const path = audioPathFor(id)
+              await mkdir(dirname(path), { recursive: true })
+              await writeFile(path, Buffer.from(payload.audioBuffer))
+            } catch (e) {
+              log.warn('audio persist failed (non-fatal)', { error: (e as Error).message })
+            }
+            const language =
+              boot.settingsRepo.get<string | null>('stt_language', null) ?? undefined
+            const result = await stt.gateway.transcribe(payload.audioBuffer, { language })
+            return {
+              ok: true,
+              text: result.text,
+              provider: result.provider,
+              latencyMs: result.latencyMs
+            }
+          } catch (e) {
+            const msg = (e as Error).message
+            log.error('transcribe-and-inject failed', { error: msg })
+            broadcastOverlayState({ state: 'idle' })
+            return { ok: false, error: msg }
+          }
+        }
+      )
+      log.info('orchestrator wired (stt:transcribe-and-inject)')
+    } catch (e) {
+      log.error('STT stack wiring failed', { error: String(e) })
     }
   } catch (e) {
     log.error('bootDb failed — running in degraded mode (no DB-backed features)', {
@@ -218,39 +362,22 @@ function wireBackend(): void {
 
 /**
  * Last-resort stubs for STT/history/vocab IPC channels when the real
- * backend cannot boot (e.g. better-sqlite3 ABI mismatch in CI). These
- * answer with safe empty values so the renderer never throws on a missing
- * handler. The real handlers replace these via `ipcMain.handle` re-register
- * if `wireBackend()` is called again later — but in practice bootDb either
- * works or doesn't for the lifetime of the app.
+ * backend cannot boot. Renderer never throws on a missing handler.
  */
 function registerStubBackendHandlers(): void {
-  // Lazy import to avoid pulling electron at module top.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ipcMain } = require('electron')
 
-  const safeHandle = (channel: string, fn: (...args: unknown[]) => unknown): void => {
+  // Stub helper — handlers run in degraded mode, exact event typing is irrelevant.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeHandle = (channel: string, fn: (...args: any[]) => unknown): void => {
     try {
       ipcMain.handle(channel, fn)
     } catch {
-      // Already registered (unlikely in degraded mode but defensive)
+      // Already registered (defensive)
     }
   }
 
-  // STT stubs
-  safeHandle('stt:get-provider-settings', () => ({
-    stt_force_local: false,
-    stt_language: null,
-    slots: {
-      slots: [
-        { slotIndex: 0, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
-        { slotIndex: 1, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
-        { slotIndex: 2, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null }
-      ],
-      onlineCount: 0,
-      totalCount: 3
-    }
-  }))
   let forceLocal = false
   let language: string | null = null
   safeHandle('stt:set-force-local', (_e: unknown, enabled: boolean) => {
@@ -261,26 +388,7 @@ function registerStubBackendHandlers(): void {
     language = lang ?? null
     return { ok: true }
   })
-  // Re-register get-provider-settings to read mutable state.
-  try {
-    ipcMain.removeHandler('stt:get-provider-settings')
-  } catch {
-    // noop
-  }
-  safeHandle('stt:get-provider-settings', () => ({
-    stt_force_local: forceLocal,
-    stt_language: language,
-    slots: {
-      slots: [
-        { slotIndex: 0, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
-        { slotIndex: 1, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
-        { slotIndex: 2, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null }
-      ],
-      onlineCount: 0,
-      totalCount: 3
-    }
-  }))
-  safeHandle('stt:pool-snapshot', () => ({
+  const emptyPool = {
     slots: [
       { slotIndex: 0, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
       { slotIndex: 1, hasKey: false, status: 'empty', usedToday: 0, dailyCap: 14400, label: null },
@@ -288,14 +396,27 @@ function registerStubBackendHandlers(): void {
     ],
     onlineCount: 0,
     totalCount: 3
+  }
+  safeHandle('stt:get-provider-settings', () => ({
+    stt_force_local: forceLocal,
+    stt_language: language,
+    slots: emptyPool
   }))
-  safeHandle('stt:add-slot', () => ({ ok: false, validation: { valid: false, error: 'backend unavailable', latencyMs: 0 } }))
-  safeHandle('stt:update-slot', () => ({ ok: false, validation: { valid: false, error: 'backend unavailable', latencyMs: 0 } }))
+  safeHandle('stt:pool-snapshot', () => emptyPool)
+  safeHandle('stt:add-slot', () => ({
+    ok: false,
+    validation: { valid: false, error: 'backend unavailable', latencyMs: 0 }
+  }))
+  safeHandle('stt:update-slot', () => ({
+    ok: false,
+    validation: { valid: false, error: 'backend unavailable', latencyMs: 0 }
+  }))
   safeHandle('stt:remove-slot', () => ({ ok: true }))
   safeHandle('stt:test-slot', () => ({ valid: false, error: 'backend unavailable', latencyMs: 0 }))
   safeHandle('stt:test-transcribe', () => {
     throw new Error('backend unavailable')
   })
+  safeHandle('stt:transcribe-and-inject', () => ({ ok: false, error: 'backend unavailable' }))
 
   // History stubs
   safeHandle('history:list', () => ({ rows: [], total: 0 }))
@@ -304,46 +425,33 @@ function registerStubBackendHandlers(): void {
   safeHandle('history:update', () => ({ ok: false, error: 'backend unavailable' }))
   safeHandle('history:delete', () => ({ ok: true }))
   safeHandle('history:export', (_e: unknown, req: { format: 'md' | 'json' }) => {
-    if (req?.format === 'json') {
-      return { format: 'json', content: '[]' }
-    }
+    if (req?.format === 'json') return { format: 'json', content: '[]' }
     return {
       format: 'md',
       content: '# flowtype — histórico de transcrições\n\n_(backend unavailable)_\n'
     }
   })
 
-  // Vocab stubs (in-memory for tests)
-  type VocabEntry = {
+  // Vocab stubs
+  type V = {
     id: string
     term_wrong: string
     term_correct: string
     case_sensitive: boolean
     scope: string
   }
-  const vocab: VocabEntry[] = []
+  const vocab: V[] = []
   safeHandle('vocab:list', () => vocab)
-  safeHandle('vocab:add', (_e: unknown, entry: {
-    term_wrong: string
-    term_correct: string
-    case_sensitive?: boolean
-    scope?: string
-  }) => {
+  safeHandle('vocab:add', (_e: unknown, entry: V) => {
     const id = `stub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const e: VocabEntry = {
-      id,
-      term_wrong: entry.term_wrong,
-      term_correct: entry.term_correct,
-      case_sensitive: !!entry.case_sensitive,
-      scope: entry.scope ?? 'global'
-    }
+    const e: V = { ...entry, id, case_sensitive: !!entry.case_sensitive, scope: entry.scope ?? 'global' }
     vocab.push(e)
     return e
   })
   safeHandle('vocab:update', (_e: unknown, patch: { id: string; [k: string]: unknown }) => {
     const idx = vocab.findIndex((v) => v.id === patch.id)
     if (idx < 0) return null
-    vocab[idx] = { ...vocab[idx], ...patch } as VocabEntry
+    vocab[idx] = { ...vocab[idx], ...patch } as V
     return vocab[idx]
   })
   safeHandle('vocab:remove', (_e: unknown, id: string) => {

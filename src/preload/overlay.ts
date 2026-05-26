@@ -2,12 +2,30 @@
  * Preload for the overlay window. Exposes a smaller, events-only surface
  * so the overlay renderer can subscribe to state transitions and badges
  * without being able to mutate global state.
+ *
+ * v0.1.1: extended to receive hotkey events (armed/released) so the overlay
+ * renderer can drive MediaRecorder and send audio buffers back to main for
+ * the full STT → vocab → inject → history pipeline.
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, type OverlayStatePayload, type OverlayBadgePayload } from '@shared/ipc-types'
+import {
+  Channels,
+  type OverlayStatePayload,
+  type OverlayBadgePayload,
+  type HotkeyArmedPayload,
+  type HotkeyReleasedPayload
+} from '@shared/ipc-types'
 
 type Unsubscribe = () => void
+
+export interface TranscribeAndInjectResult {
+  ok: boolean
+  error?: string
+  text?: string
+  provider?: 'groq' | 'local'
+  latencyMs?: number
+}
 
 const api = {
   getState: (): Promise<OverlayStatePayload> => ipcRenderer.invoke(Channels.OverlayGetState),
@@ -30,7 +48,29 @@ const api = {
     const wrap = (): void => handler()
     ipcRenderer.on(Channels.OverlayHotCornerLeave, wrap)
     return () => ipcRenderer.removeListener(Channels.OverlayHotCornerLeave, wrap)
-  }
+  },
+  // Hotkey events forwarded from main so overlay can start/stop MediaRecorder.
+  onHotkeyArmed: (handler: (p: HotkeyArmedPayload) => void): Unsubscribe => {
+    const wrap = (_: unknown, p: HotkeyArmedPayload): void => handler(p)
+    ipcRenderer.on(Channels.HotkeyArmed, wrap)
+    return () => ipcRenderer.removeListener(Channels.HotkeyArmed, wrap)
+  },
+  onHotkeyReleased: (handler: (p: HotkeyReleasedPayload) => void): Unsubscribe => {
+    const wrap = (_: unknown, p: HotkeyReleasedPayload): void => handler(p)
+    ipcRenderer.on(Channels.HotkeyReleased, wrap)
+    return () => ipcRenderer.removeListener(Channels.HotkeyReleased, wrap)
+  },
+  /**
+   * Send captured audio (webm/opus) to main for the full pipeline:
+   * STT cascade → vocab corrections → text injection → history persistence.
+   * Returns when injection finishes (or fails). Main broadcasts overlay
+   * state transitions throughout (capturing → processing → idle).
+   */
+  transcribeAndInject: (
+    audioBuffer: ArrayBuffer,
+    durationMs: number
+  ): Promise<TranscribeAndInjectResult> =>
+    ipcRenderer.invoke(Channels.SttTranscribeAndInject, { audioBuffer, durationMs })
 }
 
 contextBridge.exposeInMainWorld('flowtypeOverlay', api)
