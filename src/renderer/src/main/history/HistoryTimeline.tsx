@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../shared/components/Button'
 import { Input } from '../../shared/components/Input'
 import { Modal } from '../../shared/components/Modal'
+import { Icon } from '../../shared/components/icons/Icon'
 import { formatRelativeTime, truncate } from '../../shared/lib/format'
 import { cn } from '../../shared/lib/cn'
 import type { HistoryItem } from './HistoryApp'
@@ -169,7 +170,10 @@ function Row({
         <div className="flex items-center gap-2 text-text-muted">
           <span className="text-accent">{formatRelativeTime(item.created_at)}</span>
           <span className="text-text-faint">·</span>
-          <span>{appIcon} {item.target_app ?? 'sem app'}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {appIcon ? <Icon name={appIcon} size={11} /> : null}
+            {item.target_app ?? 'sem app'}
+          </span>
           {windowLabel ? (
             <>
               <span className="text-text-faint">·</span>
@@ -227,33 +231,36 @@ function Row({
         {item.duration_ms ? (
           <button
             type="button"
-            className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent flex items-center gap-1 font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent inline-flex items-center gap-1.5 font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Tocar áudio"
           >
-            ▶ {formatDuration(item.duration_ms)}
+            <Icon name="play" size={11} />
+            {formatDuration(item.duration_ms)}
           </button>
         ) : null}
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          ✎ editar
+          <Icon name="edit" size={11} />
+          editar
         </button>
         <button
           type="button"
           onClick={copy}
-          className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="px-2 py-1 rounded text-[10px] text-text-muted hover:bg-surface hover:text-accent inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          ⎘ copiar
+          <Icon name="copy" size={11} />
+          copiar
         </button>
         <button
           type="button"
           onClick={() => setConfirmDelete(true)}
           aria-label="Apagar transcrição"
-          className="ml-auto px-2 py-1 rounded text-[10px] text-text-faint hover:bg-surface hover:text-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
+          className="ml-auto px-2 py-1 rounded text-[10px] text-text-faint hover:bg-surface hover:text-danger inline-flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
         >
-          🗑
+          <Icon name="trash" size={12} />
         </button>
       </div>
 
@@ -356,16 +363,19 @@ function formatDuration(ms: number): string {
   return `${String(m).padStart(2, '0')}:${String(rs).padStart(2, '0')}`
 }
 
-function iconForApp(app?: string | null): string {
-  if (!app) return '·'
+import type { IconName } from '../../shared/components/icons/Icon'
+
+function iconForApp(app?: string | null): IconName | null {
+  if (!app) return null
   const a = app.toLowerCase()
-  if (a.includes('chrome')) return '🌐'
-  if (a.includes('firefox')) return '🦊'
-  if (a.includes('notepad')) return '📝'
-  if (a.includes('code')) return '📘'
-  if (a.includes('slack')) return '💬'
-  if (a.includes('teams')) return '👥'
-  if (a.includes('whatsapp')) return '💬'
-  if (a.includes('term') || a.includes('shell')) return '⌨'
-  return '◌'
+  if (a.includes('chrome') || a.includes('edge') || a.includes('firefox') || a.includes('opera') || a.includes('brave'))
+    return 'globe'
+  if (a.includes('notepad') || a.includes('word') || a.includes('docs')) return 'file-text'
+  if (a.includes('code') || a.includes('cursor') || a.includes('idea') || a.includes('webstorm') || a.includes('vim'))
+    return 'code'
+  if (a.includes('slack') || a.includes('teams') || a.includes('whatsapp') || a.includes('discord') || a.includes('telegram'))
+    return 'message'
+  if (a.includes('term') || a.includes('shell') || a.includes('powershell') || a.includes('cmd'))
+    return 'terminal'
+  return null
 }

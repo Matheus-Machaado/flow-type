@@ -5,6 +5,7 @@ import { Button } from '../../../shared/components/Button'
 import { Card } from '../../../shared/components/Card'
 import { Badge } from '../../../shared/components/Badge'
 import { Input } from '../../../shared/components/Input'
+import { Icon } from '../../../shared/components/icons/Icon'
 import { getBridge } from '../../../shared/hooks/useBridge'
 import { cn } from '../../../shared/lib/cn'
 
@@ -403,7 +404,10 @@ function NeedKeyForm({
         </div>
         <div className="mt-3">
           <Button variant="ghost" size="sm" onClick={openGroqConsole}>
-            ↗ Abrir console.groq.com
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="external" size={12} />
+              Abrir console.groq.com
+            </span>
           </Button>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { Input } from '../../../shared/components/Input'
 import { MeterBar } from '../../../shared/components/MeterBar'
 import { Modal } from '../../../shared/components/Modal'
 import { Toggle } from '../../../shared/components/Toggle'
+import { Icon } from '../../../shared/components/icons/Icon'
 import { cn } from '../../../shared/lib/cn'
 import { formatNumber, pctOf } from '../../../shared/lib/format'
 import { getBridge } from '../../../shared/hooks/useBridge'
@@ -297,8 +298,8 @@ function LocalUnavailableBanner(): JSX.Element {
   return (
     <Card className="p-3 border-warning/40 bg-warning/5">
       <div className="flex gap-2 items-start">
-        <span aria-hidden className="text-warning text-sm leading-none mt-0.5">
-          ⚠
+        <span aria-hidden className="text-warning shrink-0 mt-0.5">
+          <Icon name="alert-triangle" size={14} />
         </span>
         <div className="text-[11px] text-text-secondary leading-relaxed">
           <strong className="text-warning">Sem key Groq cadastrada</strong> — adicione

@@ -1,4 +1,5 @@
 import { cn } from '../../shared/lib/cn'
+import { Icon } from '../../shared/components/icons/Icon'
 import type { HistoryFilters } from './HistoryApp'
 
 /**
@@ -35,9 +36,9 @@ export function HistoryHeader({
         <div className="relative flex-1">
           <span
             aria-hidden
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-xs"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
           >
-            🔍
+            <Icon name="search" size={14} />
           </span>
           <input
             type="search"
@@ -52,9 +53,9 @@ export function HistoryHeader({
               type="button"
               onClick={() => onQueryChange('')}
               aria-label="Limpar busca"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary w-6 h-6 rounded-full hover:bg-surface flex items-center justify-center text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary w-6 h-6 rounded-full hover:bg-surface flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              ×
+              <Icon name="x" size={12} />
             </button>
           ) : null}
         </div>
