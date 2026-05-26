@@ -85,28 +85,14 @@ export function HistoryHeader({
             <span className="text-[10px] text-text-faint font-mono uppercase tracking-wider">
               app
             </span>
-            <select
-              value={filters.app ?? ''}
-              onChange={(e) => setApp(e.target.value || null)}
-              aria-label="Filtrar por app"
-              className="h-7 bg-bg-2 border border-border rounded-full text-[10px] text-text-secondary px-2 focus:outline-none focus:border-accent/40"
-            >
-              <option value="">todos</option>
-              {apps.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-            {filters.app ? (
-              <button
-                type="button"
-                onClick={() => setApp(null)}
-                className="text-[10px] text-text-muted hover:text-danger"
-              >
-                limpar
-              </button>
-            ) : null}
+            <Chip active={filters.app === null} onClick={() => setApp(null)}>
+              Todos
+            </Chip>
+            {apps.map((a) => (
+              <Chip key={a} active={filters.app === a} onClick={() => setApp(a)}>
+                {prettyAppName(a)}
+              </Chip>
+            ))}
           </>
         ) : null}
 
@@ -133,7 +119,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'px-2.5 py-1 rounded-full text-[10px] border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        'px-2.5 py-1 rounded-full text-[10px] border transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         active
           ? 'bg-accent text-text-on-accent font-semibold border-accent'
           : 'bg-bg-2 text-text-muted hover:text-text-primary border-border'
@@ -142,4 +128,29 @@ function Chip({
       {children}
     </button>
   )
+}
+
+/**
+ * Formata exe name → label amigável.
+ * 'chrome.exe' → 'Chrome'; 'Code.exe' → 'Code'; 'whatsapp.exe' → 'WhatsApp'.
+ */
+function prettyAppName(exe: string): string {
+  const base = exe.replace(/\.exe$/i, '').replace(/[._-]+/g, ' ').trim()
+  if (!base) return exe
+  // Casos especiais com capitalização própria.
+  const lower = base.toLowerCase()
+  const SPECIAL: Record<string, string> = {
+    whatsapp: 'WhatsApp',
+    chatgpt: 'ChatGPT',
+    vscode: 'VS Code',
+    'visual studio code': 'VS Code',
+    'powerpoint': 'PowerPoint',
+    'msteams': 'Teams'
+  }
+  if (SPECIAL[lower]) return SPECIAL[lower]
+  // Default: title-case (primeira letra de cada palavra).
+  return base
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 }
