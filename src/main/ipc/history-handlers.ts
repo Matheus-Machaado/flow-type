@@ -31,7 +31,9 @@ export function registerHistoryIpcHandlers(deps: HistoryIpcDeps): void {
     const offset = req.offset ?? 0
     const rows = deps.repo.list(req.filters ?? {}, limit, offset)
     const total = deps.repo.count(req.filters ?? {})
-    return { rows, total }
+    // Renderer espera `items` (terminologia da UI); `rows` mantido como alias
+    // pra compat com testes / tools externas.
+    return { items: rows, rows, total }
   })
 
   ipcMain.handle(Channels.HistorySearch, (_e, req: HistorySearchRequest) => {
@@ -40,7 +42,7 @@ export function registerHistoryIpcHandlers(deps: HistoryIpcDeps): void {
       limit: req.limit ?? 50,
       offset: req.offset ?? 0
     })
-    return { rows, total: rows.length }
+    return { items: rows, rows, total: rows.length }
   })
 
   ipcMain.handle(Channels.HistoryGetById, (_e, id: string) => {

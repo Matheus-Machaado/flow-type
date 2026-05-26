@@ -39,7 +39,11 @@ export const SttChannels = {
 
 export interface AddSlotPayload {
   slotIndex: 0 | 1 | 2;
-  apiKey: string;
+  /**
+   * Obrigatório em `stt:add-slot`. Opcional em `stt:update-slot` — quando
+   * ausente/vazio o handler preserva a key atual e atualiza só label/dailyCap.
+   */
+  apiKey?: string;
   label?: string;
   dailyCap?: number;
 }
@@ -95,7 +99,13 @@ export function registerSttIpcHandlers(deps: SttIpcDeps): void {
   ipcMain.handle(SttChannels.PoolSnapshot, (): PoolSnapshot => deps.pool.snapshot());
 
   ipcMain.handle(SttChannels.TestTranscribe, async (_e, payload: TestTranscribePayload) => {
-    return deps.gateway.transcribe(payload.audio, { language: payload.language });
+    // Test-transcribe NÃO dispara onTranscribed: é só "teste de mic"; o resultado
+    // é exibido inline na UI. Sem paste (a janela ativa é o próprio app Settings,
+    // colaria texto dentro dele) e sem entrada no histórico (não é uso real).
+    return deps.gateway.transcribe(payload.audio, {
+      language: payload.language,
+      skipPostHook: true,
+    });
   });
 
   ipcMain.handle(
@@ -104,7 +114,14 @@ export function registerSttIpcHandlers(deps: SttIpcDeps): void {
       ok: boolean;
       validation: ValidateKeyResult;
     }> => {
-      const validation = await validate(payload.apiKey);
+      if (!payload.apiKey || payload.apiKey.trim().length === 0) {
+        return {
+          ok: false,
+          validation: { valid: false, error: 'API key obrigatória.', latencyMs: 0 },
+        };
+      }
+      const apiKey = payload.apiKey;
+      const validation = await validate(apiKey);
       if (!validation.valid) {
         logger.warn({
           event: 'stt.add_slot.validation_failed',
@@ -113,7 +130,7 @@ export function registerSttIpcHandlers(deps: SttIpcDeps): void {
         });
         // Salva a key + label mas marca status='invalid' pra UI poder mostrar.
         deps.pool.setSlot(payload.slotIndex, {
-          apiKey: payload.apiKey,
+          apiKey,
           label: payload.label ?? null,
           dailyCap: payload.dailyCap,
           validationOk: false,
@@ -122,7 +139,7 @@ export function registerSttIpcHandlers(deps: SttIpcDeps): void {
         return { ok: false, validation };
       }
       deps.pool.setSlot(payload.slotIndex, {
-        apiKey: payload.apiKey,
+        apiKey,
         label: payload.label ?? null,
         dailyCap: payload.dailyCap,
         validationOk: true,
@@ -135,9 +152,40 @@ export function registerSttIpcHandlers(deps: SttIpcDeps): void {
   );
 
   ipcMain.handle(SttChannels.UpdateSlot, async (_e, payload: AddSlotPayload) => {
-    const validation = await validate(payload.apiKey);
+    // Se o caller NÃO mandou apiKey (ou mandou vazio), preserva a key atual e
+    // só atualiza label/dailyCap — sem re-validar contra a API Groq. Permite
+    // editar só o apelido sem re-digitar a chave.
+    const hasNewKey = typeof payload.apiKey === 'string' && payload.apiKey.trim().length > 0;
+    if (!hasNewKey) {
+      const existing = deps.pool.getSlotApiKey(payload.slotIndex);
+      if (!existing) {
+        return {
+          ok: false,
+          validation: {
+            valid: false,
+            error: 'Slot vazio — informe a key.',
+            latencyMs: 0,
+          },
+        };
+      }
+      // Update meta-only: re-set com a key existente, label/dailyCap novos.
+      // validationOk=true assume que a key continua válida (não re-checa).
+      deps.pool.setSlot(payload.slotIndex, {
+        apiKey: existing,
+        label: payload.label ?? null,
+        dailyCap: payload.dailyCap,
+        validationOk: true,
+      });
+      return {
+        ok: true,
+        validation: { valid: true, latencyMs: 0 },
+      };
+    }
+    // Caso normal: key nova → revalidar antes de salvar.
+    const apiKey = payload.apiKey as string; // narrowed by hasNewKey guard above.
+    const validation = await validate(apiKey);
     deps.pool.setSlot(payload.slotIndex, {
-      apiKey: payload.apiKey,
+      apiKey,
       label: payload.label ?? null,
       dailyCap: payload.dailyCap,
       validationOk: validation.valid,

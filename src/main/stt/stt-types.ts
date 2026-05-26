@@ -18,6 +18,12 @@ export interface TranscribeOptions {
   language?: string;
   /** Default 'audio/webm;codecs=opus' (MediaRecorder padrão). */
   mimeType?: string;
+  /**
+   * Quando true, pula o `onTranscribed` hook (paste + history insert + badge).
+   * Usado pelo `stt:test-transcribe` — teste de mic mostra resultado inline
+   * sem precisar colar nada nem poluir histórico.
+   */
+  skipPostHook?: boolean;
 }
 
 export interface TranscribeResult {

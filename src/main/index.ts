@@ -419,8 +419,8 @@ function registerStubBackendHandlers(): void {
   safeHandle('stt:transcribe-and-inject', () => ({ ok: false, error: 'backend unavailable' }))
 
   // History stubs
-  safeHandle('history:list', () => ({ rows: [], total: 0 }))
-  safeHandle('history:search', () => ({ rows: [], total: 0 }))
+  safeHandle('history:list', () => ({ items: [], rows: [], total: 0 }))
+  safeHandle('history:search', () => ({ items: [], rows: [], total: 0 }))
   safeHandle('history:get-by-id', () => null)
   safeHandle('history:update', () => ({ ok: false, error: 'backend unavailable' }))
   safeHandle('history:delete', () => ({ ok: true }))

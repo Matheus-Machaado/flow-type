@@ -104,8 +104,12 @@ const api = {
     poolSnapshot: () => ipcRenderer.invoke(SttChannels.PoolSnapshot),
     addSlot: (payload: { slotIndex: 0 | 1 | 2; apiKey: string; label?: string; dailyCap?: number }) =>
       ipcRenderer.invoke(SttChannels.AddSlot, payload),
-    updateSlot: (payload: { slotIndex: 0 | 1 | 2; apiKey: string; label?: string; dailyCap?: number }) =>
-      ipcRenderer.invoke(SttChannels.UpdateSlot, payload),
+    updateSlot: (payload: {
+      slotIndex: 0 | 1 | 2
+      apiKey?: string
+      label?: string
+      dailyCap?: number
+    }) => ipcRenderer.invoke(SttChannels.UpdateSlot, payload),
     removeSlot: (slotIndex: 0 | 1 | 2) =>
       ipcRenderer.invoke(SttChannels.RemoveSlot, { slotIndex }),
     testSlot: (slotIndex: 0 | 1 | 2) => ipcRenderer.invoke(SttChannels.TestSlot, { slotIndex })

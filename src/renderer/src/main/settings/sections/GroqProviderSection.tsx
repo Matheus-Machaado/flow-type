@@ -526,13 +526,26 @@ function AddKeyCard({
   const [error, setError] = useState<string | null>(null)
   const bridge = getBridge()
 
-  const canSubmit = useMemo(
-    () => apiKey.startsWith('gsk_') && apiKey.length >= 20,
-    [apiKey]
-  )
+  // Em modo de edição, a key pode ficar em branco (mantém a key atual).
+  // Em modo de adição (slot vazio), a key é obrigatória.
+  const labelChanged = label !== initialLabel
+  const keyFilled = apiKey.length > 0
+  const keyValid = apiKey.startsWith('gsk_') && apiKey.length >= 20
+  const canSubmit = useMemo(() => {
+    if (editing) {
+      // Salvar OK se: usuário só quer mudar label (key em branco), OU forneceu key nova válida
+      if (!keyFilled) return labelChanged
+      return keyValid
+    }
+    return keyValid
+  }, [editing, keyFilled, keyValid, labelChanged])
 
   const submit = async (): Promise<void> => {
-    if (!canSubmit) {
+    if (editing && keyFilled && !keyValid) {
+      setError('A key precisa começar com gsk_ e ter pelo menos 20 caracteres.')
+      return
+    }
+    if (!editing && !keyValid) {
       setError('A key precisa começar com gsk_ e ter pelo menos 20 caracteres.')
       return
     }
@@ -544,13 +557,20 @@ function AddKeyCard({
         onSaved()
         return
       }
-      const op = editing ? bridge.stt.updateSlot : bridge.stt.addSlot
-      const r = (await op({
-        slotIndex,
-        apiKey,
-        label: label || undefined,
-        dailyCap
-      })) as { ok: boolean; validation: { error?: string } }
+      // Em edição sem key nova: omite apiKey → backend preserva a atual.
+      const r = (editing
+        ? await bridge.stt.updateSlot({
+            slotIndex,
+            apiKey: keyFilled ? apiKey : undefined,
+            label: label || undefined,
+            dailyCap
+          })
+        : await bridge.stt.addSlot({
+            slotIndex,
+            apiKey,
+            label: label || undefined,
+            dailyCap
+          })) as { ok: boolean; validation: { error?: string } }
       if (!r.ok) {
         setError(r.validation?.error ?? 'Key rejeitada pelo Groq')
         setSaving(false)
@@ -586,11 +606,15 @@ function AddKeyCard({
           autoComplete="off"
           spellCheck={false}
           maxLength={120}
-          placeholder="gsk_xxxxxxxxxxxxxxxx"
+          placeholder={editing ? 'Deixe em branco pra manter a atual' : 'gsk_xxxxxxxxxxxxxxxx'}
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value.trim())}
           invalid={Boolean(error && !canSubmit)}
-          hint="Pegamos do console.groq.com. Validamos antes de salvar."
+          hint={
+            editing
+              ? 'Em branco mantém a key atual. Cole uma key nova só se quiser trocar.'
+              : 'Pegamos do console.groq.com. Validamos antes de salvar.'
+          }
         />
 
         <Input

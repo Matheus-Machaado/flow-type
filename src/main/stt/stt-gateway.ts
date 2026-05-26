@@ -197,7 +197,7 @@ export class SttGateway {
           const cascadeResult = this.applyVocabIfAvailable(cascadeResult0);
           this.emitBadge(cascadeResult);
           this.logCompleted(cascadeResult, t0);
-          await this.runPostHook(cascadeResult, t0);
+          if (!opts.skipPostHook) await this.runPostHook(cascadeResult, t0);
           return cascadeResult;
         } catch (err) {
           const errSlot = (err as { slotIndex?: number }).slotIndex;
