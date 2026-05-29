@@ -6,7 +6,7 @@
 
 **Sua voz vira texto onde você estiver.**
 
-Dictation universal pra Windows: segure `Right Ctrl`, fale, solte. Em menos de 1 segundo o texto cola no campo ativo — Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, qualquer app.
+Dictation universal pra Windows: segure `Right Ctrl`, fale, solte. Em menos de 1 segundo o texto cola no campo ativo: Claude, ChatGPT, Notepad, WhatsApp Web, VSCode, qualquer app.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-5FE6FF.svg)](LICENSE)
 [![Windows 10+](https://img.shields.io/badge/Windows-10%2F11-0078D4.svg)](#instalação)
@@ -14,7 +14,7 @@ Dictation universal pra Windows: segure `Right Ctrl`, fale, solte. Em menos de 1
 [![Tests](https://img.shields.io/badge/tests-171%2F171-22c55e.svg)](#qualidade)
 [![Site](https://img.shields.io/badge/site-flow--type--189.netlify.app-5FE6FF.svg)](https://flow-type-189.netlify.app)
 
-[**🌐 Site oficial**](https://flow-type-189.netlify.app) · [**⬇ Baixar para Windows**](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.5.exe) · [**📖 FAQ**](https://flow-type-189.netlify.app/#faq)
+[**🌐 Site oficial**](https://flow-type-189.netlify.app) · [**⬇ Baixar para Windows**](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.7.exe) · [**📖 FAQ**](https://flow-type-189.netlify.app/#faq)
 
 </div>
 
@@ -100,7 +100,7 @@ Dictation universal pra Windows: segure `Right Ctrl`, fale, solte. Em menos de 1
 
 ### Opção 1 — Instalador (`.exe`)
 
-1. Baixe [**Flow Type Setup 0.1.5.exe**](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.5.exe) (83 MB)
+1. Baixe [**Flow Type Setup 0.1.7.exe**](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.7.exe) (83 MB)
 2. Execute o instalador
 3. ⚠️ Windows vai mostrar **SmartScreen warning** (v0.1 ainda sem code signing): clique **Mais informações → Executar mesmo assim**
 4. Siga o onboarding (4 passos · ~1 minuto)
@@ -108,12 +108,12 @@ Dictation universal pra Windows: segure `Right Ctrl`, fale, solte. Em menos de 1
 
 ### Opção 2 — Portable (`.exe` standalone)
 
-[**Flow Type-0.1.5-portable.exe**](https://flow-type-189.netlify.app/download/flowtype-portable-v0.1.5.exe) — não instala, roda direto da pasta.
+[**Flow Type-0.1.7-portable.exe**](https://flow-type-189.netlify.app/download/flowtype-portable-v0.1.7.exe) — não instala, roda direto da pasta.
 
 ### Verificar integridade (opcional)
 
 ```powershell
-Get-FileHash flowtype-setup-v0.1.5.exe -Algorithm SHA256
+Get-FileHash flowtype-setup-v0.1.7.exe -Algorithm SHA256
 # Esperado: 3c42357e3ffb0f0f4b080b24261d34dd43f7d753c0ccdd430287cd31f5f81cdf
 ```
 
@@ -295,6 +295,6 @@ Issues abertos pra discussão antes de PR grande — economiza tempo.
 
 **Built solo por [@Matheus-Machaado](https://github.com/Matheus-Machaado)** · com [Claude Code](https://claude.com/claude-code) como par de programação
 
-[🌐 Site](https://flow-type-189.netlify.app) · [⬇ Download](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.5.exe) · [📖 FAQ](https://flow-type-189.netlify.app/#faq) · [🐛 Issues](https://github.com/Matheus-Machaado/flow-type/issues)
+[🌐 Site](https://flow-type-189.netlify.app) · [⬇ Download](https://flow-type-189.netlify.app/download/flowtype-setup-v0.1.7.exe) · [📖 FAQ](https://flow-type-189.netlify.app/#faq) · [🐛 Issues](https://github.com/Matheus-Machaado/flow-type/issues)
 
 </div>

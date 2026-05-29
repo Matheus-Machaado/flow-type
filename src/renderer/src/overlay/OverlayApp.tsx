@@ -5,6 +5,13 @@ import { ArmedPulse } from './states/ArmedPulse'
 import { CapturingWaveform } from './states/CapturingWaveform'
 import { ProcessingSpinner } from './states/ProcessingSpinner'
 
+// Cap fixo de gravação (CR F-001). Acima disso o overlay para sozinho:
+// em push-to-talk para o MediaRecorder; em LOCK chama requestForceUnlock
+// pra main, que emite onReleased pelo caminho normal (mantém pipeline).
+const RECORDING_MAX_MS = 60_000
+// Cor da barra muda pra warning quando faltam ≤ este tempo.
+const CAP_WARN_MS = 10_000
+
 /**
  * The overlay window root. v0.1.1 — orchestrates the full pipeline:
  *  1. hotkey:armed → starts MediaRecorder (mic capture).
@@ -21,12 +28,20 @@ export function OverlayApp(): JSX.Element {
   const [badge, setBadge] = useState<OverlayBadgePayload | null>(null)
   const [hover, setHover] = useState(false)
   const [capturingStartedAt, setCapturingStartedAt] = useState<number>(Date.now())
+  // CR F-002: locked = entered LOCK via double-tap (overlay shows badge).
+  const [isLocked, setIsLocked] = useState(false)
+  // CR F-001: tick triggers re-render so the progress bar updates smoothly.
+  const [, setProgressTick] = useState(0)
 
   // MediaRecorder + stream refs survive renders.
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const recordStartedAtRef = useRef<number>(0)
+  // CR F-001: cap timer + tick interval for progress bar.
+  const capTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isLockedRef = useRef(false)
 
   // Live mic level (0..1). Drives CapturingWaveform — não há fallback fake.
   // Quando o mic está mudo/desconectado, fica em 0 e a waveform achata,
@@ -94,6 +109,17 @@ export function OverlayApp(): JSX.Element {
         recorder.start(100) // emit chunks every 100ms; covers short holds
         recorderRef.current = recorder
         recordStartedAtRef.current = Date.now()
+
+        // CR F-001: arm the recording cap. Whoever stops first wins
+        // (user release / overlay cap timer / forced unlock from main).
+        if (capTimerRef.current) clearTimeout(capTimerRef.current)
+        capTimerRef.current = setTimeout(() => {
+          handleCapHit()
+        }, RECORDING_MAX_MS)
+        if (tickIntervalRef.current) clearInterval(tickIntervalRef.current)
+        tickIntervalRef.current = setInterval(() => {
+          setProgressTick((n) => (n + 1) % 1_000_000)
+        }, 200)
 
         // Real mic-level meter: AnalyserNode reads PCM directly from the
         // MediaStream and computes RMS per frame. Drives the waveform UI.
@@ -194,6 +220,14 @@ export function OverlayApp(): JSX.Element {
         cancelAnimationFrame(rmsRafRef.current)
         rmsRafRef.current = null
       }
+      if (capTimerRef.current) {
+        clearTimeout(capTimerRef.current)
+        capTimerRef.current = null
+      }
+      if (tickIntervalRef.current) {
+        clearInterval(tickIntervalRef.current)
+        tickIntervalRef.current = null
+      }
       try {
         sourceRef.current?.disconnect()
       } catch {
@@ -213,11 +247,39 @@ export function OverlayApp(): JSX.Element {
       setVolumeRms(0)
     }
 
+    /**
+     * CR F-001: recording cap reached. If we're in LOCK, ask main to leave
+     * LOCK (it emits `hotkey:released` through the regular channel, which
+     * routes us back into stopRecording above). If we're in plain
+     * push-to-talk we just stop locally; main will see the audio buffer
+     * arrive and broadcast the processing transition itself.
+     */
+    const handleCapHit = (): void => {
+      if (!recorderRef.current) return
+      if (isLockedRef.current) {
+        try {
+          bridge.requestForceUnlock({ reason: 'recording-cap' })
+        } catch (err) {
+          console.warn('[overlay] requestForceUnlock failed; stopping locally', err)
+          void stopRecording()
+        }
+        return
+      }
+      // Push-to-talk: stop locally regardless of whether the user is still
+      // pressing the key. The held key staying down has no further effect
+      // because handleUp on main will see armedFired=true → emit released.
+      void stopRecording()
+    }
+
     const unsubArmed = bridge.onHotkeyArmed?.(() => {
       void startRecording()
     })
     const unsubReleased = bridge.onHotkeyReleased?.(() => {
       void stopRecording()
+    })
+    const unsubLock = bridge.onHotkeyLockChanged?.((p) => {
+      isLockedRef.current = p.locked
+      setIsLocked(p.locked)
     })
 
     return () => {
@@ -227,6 +289,7 @@ export function OverlayApp(): JSX.Element {
       unsubLeave?.()
       unsubArmed?.()
       unsubReleased?.()
+      unsubLock?.()
       cleanupRecording()
     }
   }, [queryState])
@@ -235,6 +298,11 @@ export function OverlayApp(): JSX.Element {
   const isIdle = state.state === 'idle'
   const idleOpacity = hover ? 1 : 0.45
   const opacity = isIdle ? idleOpacity : 1
+  // CR F-001: progress bar visible while we have a cap timer running.
+  const showCap = state.state === 'capturing' && recordStartedAtRef.current > 0
+  const elapsedMs = showCap ? Math.max(0, Date.now() - recordStartedAtRef.current) : 0
+  const capProgress = Math.min(1, elapsedMs / RECORDING_MAX_MS)
+  const capWarning = RECORDING_MAX_MS - elapsedMs <= CAP_WARN_MS
 
   return (
     <div
@@ -243,15 +311,46 @@ export function OverlayApp(): JSX.Element {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div className="relative w-full h-full rounded-[12px] bg-bg-1/85 backdrop-blur-sm border border-border-strong flex items-center px-3">
+      <div className="relative w-full h-full rounded-[12px] bg-bg-1/85 backdrop-blur-sm border border-border-strong flex items-center px-3 overflow-hidden">
         {/* Drag handle (top half is draggable; bottom half ignores so clicks/hover still work). */}
         <div
           className="overlay-drag-handle absolute top-0 left-0 right-0 h-1/2 pointer-events-auto"
           aria-hidden="true"
         />
         <StateView state={state} startedAt={capturingStartedAt} liveRms={volumeRms} />
+        {isLocked && state.state === 'capturing' ? <LockChip /> : null}
         {badge ? <Badge badge={badge} /> : null}
+        {showCap ? <CapProgressBar progress={capProgress} warning={capWarning} /> : null}
       </div>
+    </div>
+  )
+}
+
+function LockChip(): JSX.Element {
+  return (
+    <span
+      className="absolute top-1 right-1.5 text-[9px] font-mono uppercase tracking-wider text-accent bg-accent/10 border border-accent/30 px-1.5 py-[1px] rounded-sm"
+      role="status"
+      aria-label="Gravação travada. Toque na hotkey para parar."
+      title="LOCK ativo — toque na hotkey pra parar"
+    >
+      lock
+    </span>
+  )
+}
+
+function CapProgressBar({ progress, warning }: { progress: number; warning: boolean }): JSX.Element {
+  const widthPct = (progress * 100).toFixed(1)
+  const color = warning ? 'bg-warning' : 'bg-accent/70'
+  return (
+    <div
+      className="absolute bottom-0 left-0 right-0 h-[2px] bg-border/40"
+      aria-hidden="true"
+    >
+      <div
+        className={`${color} h-full transition-[width] duration-200 ease-linear`}
+        style={{ width: `${widthPct}%` }}
+      />
     </div>
   )
 }

@@ -5,13 +5,20 @@
  * release). We listen to keydown/keyup, identify "Right Ctrl" (or any
  * remapped binding), enforce a configurable hold threshold, then emit:
  *
- *   - `hotkey:armed`    once hold > hotkey_hold_min_ms
- *   - `hotkey:released` on keyup (if armed)
+ *   - `hotkey:armed`         once hold > hotkey_hold_min_ms (push-to-talk)
+ *   - `hotkey:released`      on keyup (if armed)
+ *   - `hotkey:lock-changed`  when double-tap toggles lock on/off
+ *
+ * Lock mode (CR F-002): two quick taps of the same key within
+ * DOUBLE_TAP_GAP_MAX_MS enter LOCK. While locked, the overlay stays in
+ * "capturing" without anyone holding the key. Any subsequent single tap
+ * (or the recording cap timeout fired by the overlay) exits LOCK,
+ * emitting a regular `hotkey:released`.
  *
  * If uIOhook fails to load (missing native binary), we degrade gracefully
  * to Electron `globalShortcut` (press-only) so the rest of the app still
- * boots — a warning is logged and the badge in the overlay reflects this
- * via the `mode` flag.
+ * boots; a warning is logged and the badge in the overlay reflects this
+ * via the `mode` flag. Lock mode is uIOhook-only.
  */
 
 import { app, globalShortcut } from 'electron'
@@ -23,9 +30,15 @@ const log = createLogger('hotkey-manager')
 export type HotkeyMode = 'uiohook' | 'electron-fallback' | 'disabled'
 
 export interface HotkeyEvents {
-  onArmed: (info: { startedAt: number }) => void
-  onReleased: (info: { holdDurationMs: number; cancelled: boolean }) => void
+  onArmed: (info: { startedAt: number; locked?: boolean }) => void
+  onReleased: (info: { holdDurationMs: number; cancelled: boolean; fromLock?: boolean }) => void
+  onLockChanged?: (info: { locked: boolean; since?: number }) => void
 }
+
+// Tap = keydown→keyup within this window (anything longer is a hold candidate).
+const TAP_MAX_MS = 200
+// Two taps must be at most this far apart (1st keyup → 2nd keydown) to lock.
+const DOUBLE_TAP_GAP_MAX_MS = 350
 
 interface UiohookKeyEvent {
   keycode: number
@@ -62,6 +75,15 @@ class HotkeyManager {
   private currentBinding: string = 'Right Ctrl'
   private holdMinMs = 150
   private events: HotkeyEvents | null = null
+
+  // Lock state (CR F-002 double-tap toggle).
+  private isLocked = false
+  private lockedSince: number | null = null
+  private lastTapKeyupAt: number | null = null
+  private tapExpireTimer: NodeJS.Timeout | null = null
+  // Skip exactly one keyup (set when we synthetically consume a press,
+  // e.g. the 2nd keydown that entered LOCK, or the keydown that left LOCK).
+  private ignoreNextKeyup = false
 
   init(events: HotkeyEvents): void {
     this.events = events
@@ -171,14 +193,53 @@ class HotkeyManager {
     const keycode = this.resolveKeycode(this.currentBinding)
     if (keycode === null || e.keycode !== keycode) return
 
+    const now = Date.now()
+
+    // If locked, any keydown of the bound key exits LOCK as a normal release.
+    if (this.isLocked) {
+      const heldFor = now - (this.lockedSince ?? now)
+      this.isLocked = false
+      this.lockedSince = null
+      this.lastTapKeyupAt = null
+      this.armedAt = null
+      this.armedFired = false
+      this.heldKeycode = null
+      // The keyup paired with this keydown will arrive shortly; swallow it.
+      this.ignoreNextKeyup = true
+      this.events?.onLockChanged?.({ locked: false })
+      this.events?.onReleased({ holdDurationMs: heldFor, cancelled: false, fromLock: true })
+      log.debug('hotkey lock OFF (keypress while locked)', { heldFor })
+      return
+    }
+
     // Already holding — ignore auto-repeat events.
     if (this.heldKeycode !== null) return
 
     this.heldKeycode = e.keycode
-    this.armedAt = Date.now()
+    this.armedAt = now
     this.armedFired = false
 
-    // Defer "armed" signal until hold threshold passed.
+    // Double-tap detection: is there a recent short tap within the gap window?
+    if (
+      this.lastTapKeyupAt !== null &&
+      now - this.lastTapKeyupAt <= DOUBLE_TAP_GAP_MAX_MS
+    ) {
+      this.isLocked = true
+      this.lockedSince = now
+      this.armedFired = true
+      this.ignoreNextKeyup = true
+      this.lastTapKeyupAt = null
+      if (this.tapExpireTimer) {
+        clearTimeout(this.tapExpireTimer)
+        this.tapExpireTimer = null
+      }
+      this.events?.onLockChanged?.({ locked: true, since: now })
+      this.events?.onArmed({ startedAt: now, locked: true })
+      log.debug('hotkey lock ON (double-tap)', { since: now })
+      return
+    }
+
+    // Normal flow: schedule "armed" after the hold threshold.
     this.armTimer = setTimeout(() => {
       if (this.heldKeycode === null) return
       this.armedFired = true
@@ -188,7 +249,21 @@ class HotkeyManager {
 
   private handleUp(e: UiohookKeyEvent): void {
     if (this.mode !== 'uiohook') return
-    if (e.keycode !== this.heldKeycode) return
+    if (e.keycode !== this.heldKeycode && !this.ignoreNextKeyup) return
+
+    // Swallow exactly one keyup after a synthetic press consumption
+    // (the 2nd keydown that entered LOCK, or the tap that exited LOCK).
+    if (this.ignoreNextKeyup) {
+      this.ignoreNextKeyup = false
+      if (this.armTimer) {
+        clearTimeout(this.armTimer)
+        this.armTimer = null
+      }
+      this.heldKeycode = null
+      this.armedAt = null
+      this.armedFired = false
+      return
+    }
 
     const heldFor = Date.now() - (this.armedAt ?? Date.now())
     const wasArmed = this.armedFired
@@ -203,7 +278,15 @@ class HotkeyManager {
     this.armedFired = false
 
     if (cancelled) {
-      // released before hold threshold — silently drop, no event emitted
+      // Short release: candidate for double-tap if duration ≤ TAP_MAX_MS.
+      if (heldFor <= TAP_MAX_MS) {
+        this.lastTapKeyupAt = Date.now()
+        if (this.tapExpireTimer) clearTimeout(this.tapExpireTimer)
+        this.tapExpireTimer = setTimeout(() => {
+          this.lastTapKeyupAt = null
+          this.tapExpireTimer = null
+        }, DOUBLE_TAP_GAP_MAX_MS + 50)
+      }
       log.debug('hotkey cancelled (released before threshold)', {
         heldFor,
         threshold: this.holdMinMs
@@ -211,6 +294,30 @@ class HotkeyManager {
       return
     }
     this.events?.onReleased({ holdDurationMs: heldFor, cancelled: false })
+  }
+
+  /**
+   * External trigger to leave LOCK programmatically (e.g. overlay timer
+   * hit the 60s cap and forced a stop, or a future Settings 'Cancel'
+   * button). No-op when not locked.
+   */
+  forceUnlock(reason: string): void {
+    if (!this.isLocked) return
+    const now = Date.now()
+    const heldFor = now - (this.lockedSince ?? now)
+    this.isLocked = false
+    this.lockedSince = null
+    this.armedFired = false
+    this.armedAt = null
+    this.heldKeycode = null
+    this.lastTapKeyupAt = null
+    log.debug('hotkey lock OFF (forced)', { reason, heldFor })
+    this.events?.onLockChanged?.({ locked: false })
+    this.events?.onReleased({ holdDurationMs: heldFor, cancelled: false, fromLock: true })
+  }
+
+  isLockActive(): boolean {
+    return this.isLocked
   }
 
   rebind(newBinding: string): void {
@@ -234,6 +341,7 @@ class HotkeyManager {
       /* ignore */
     }
     if (this.armTimer) clearTimeout(this.armTimer)
+    if (this.tapExpireTimer) clearTimeout(this.tapExpireTimer)
   }
 }
 

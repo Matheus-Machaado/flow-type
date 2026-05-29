@@ -56,11 +56,26 @@ export interface WindowStateMap {
 
 export interface HotkeyArmedPayload {
   hwndSnapshot: WindowInfo | null
+  /** True when this armed event entered LOCK via double-tap (CR F-002). */
+  locked?: boolean
 }
 
 export interface HotkeyReleasedPayload {
   holdDurationMs: number
   hwndSnapshot: WindowInfo | null
+  /** True when the release came from leaving LOCK (tap or forced unlock). */
+  fromLock?: boolean
+}
+
+export interface HotkeyLockChangedPayload {
+  locked: boolean
+  since?: number
+  /** Optional cap configured by main (ms). Overlay can render a progress bar. */
+  maxDurationMs?: number
+}
+
+export interface HotkeyForceUnlockPayload {
+  reason: 'recording-cap' | 'user-cancel'
 }
 
 export interface HotkeyTestComboPayload {
@@ -142,6 +157,8 @@ export const Channels = {
   // Hotkey
   HotkeyArmed: 'hotkey:armed',
   HotkeyReleased: 'hotkey:released',
+  HotkeyLockChanged: 'hotkey:lock-changed',
+  HotkeyForceUnlock: 'hotkey:force-unlock',
   HotkeyTestCombo: 'hotkey:test-combo',
   HotkeyRebind: 'hotkey:rebind',
   HotkeySetBinding: 'hotkey:set-binding',

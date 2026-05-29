@@ -1,0 +1,103 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+const lastReview = "29 de maio de 2026";
+---
+
+<BaseLayout
+  title="Termos de uso | Flow Type"
+  description="Termos de uso do Flow Type. Software MIT, sem garantia, suporte best-effort."
+>
+  <Header />
+  <main id="main" class="max-w-3xl mx-auto px-6 py-16 sm:py-20">
+    <header class="mb-10">
+      <p class="text-xs font-mono text-muted uppercase tracking-wider mb-3">Legal</p>
+      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">Termos de uso</h1>
+      <p class="text-sm text-muted mt-3">Última revisão: {lastReview}</p>
+    </header>
+
+    <article class="space-y-8 text-sm text-fg-soft leading-relaxed">
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Resumo</h2>
+        <p>
+          O Flow Type é software open-source sob licença MIT. Você pode usar, copiar,
+          modificar e distribuir livremente, inclusive em uso comercial. Não tem
+          garantia, não tem SLA. Suporte é best-effort via GitHub Issues.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Licença</h2>
+        <p>
+          O código é distribuído sob a
+          <a href="/license" class="text-accent hover:underline">licença MIT</a>.
+          O texto integral está em <code class="font-mono">LICENSE</code> no repositório
+          e na página linkada acima.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Sem garantia</h2>
+        <p>
+          O software é fornecido "AS IS", sem garantia de qualquer natureza, expressa
+          ou implícita, incluindo mas não limitado a garantias de comercialização,
+          adequação a um propósito específico ou não-infração.
+        </p>
+        <p class="mt-3">
+          Em nenhuma hipótese os autores serão responsáveis por qualquer reclamação,
+          dano ou outra responsabilidade derivada do uso do software.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Serviços de terceiros</h2>
+        <p>
+          O modo cloud envia áudio à API da Groq pra transcrição. Você usa a Groq
+          sob os termos próprios deles, com a chave que você cadastra no app. O Flow
+          Type não intermedia, não revende, não armazena seus áudios em servidor
+          algum. Detalhes em <a href="/privacy" class="text-accent hover:underline">Privacidade</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Uso aceitável</h2>
+        <p>
+          O Flow Type é uma ferramenta de produtividade. Não é responsabilidade dos
+          autores o conteúdo que você decide ditar ou transcrever. Não use a
+          ferramenta pra fins ilegais (gravação sem consentimento onde isso for
+          ilegal, fraude, assédio, etc.). Você é responsável pelo cumprimento das
+          leis locais de gravação e tratamento de dados.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Suporte</h2>
+        <p>
+          Suporte é best-effort, sem SLA. Caminhos:
+        </p>
+        <ul class="space-y-2 list-disc pl-5 mt-3">
+          <li>
+            <a href="https://github.com/flowtypeapp/flowtype/issues" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">GitHub Issues</a>:
+            bugs, features, dúvidas técnicas.
+          </li>
+          <li>
+            <a href="mailto:matheus.machaado.dev@gmail.com" class="text-accent hover:underline">matheus.machaado.dev@gmail.com</a>:
+            contato direto pra coisas que não cabem em issue pública.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Mudanças nestes termos</h2>
+        <p>
+          Estes termos podem ser atualizados conforme o projeto evolui. A data de
+          última revisão fica no topo da página. Mudanças significativas serão
+          mencionadas no <a href="/changelog" class="text-accent hover:underline">changelog</a>.
+        </p>
+      </section>
+    </article>
+  </main>
+  <Footer />
+</BaseLayout>

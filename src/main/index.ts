@@ -21,7 +21,8 @@ import {
   registerIpcHandlers,
   broadcastOverlayState,
   broadcastHotkeyArmed,
-  broadcastHotkeyReleased
+  broadcastHotkeyReleased,
+  broadcastHotkeyLockChanged
 } from './ipc/ipc-router'
 import { setAutoStart, isAutoStartEnabled, startedFromLogin } from './auto-start'
 
@@ -98,7 +99,7 @@ app.whenReady().then(async () => {
     log.info('hotkey manager disabled via FLOWTYPE_DISABLE_HOTKEY')
   } else {
     hotkeyManager.init({
-      onArmed: () => {
+      onArmed: ({ locked }) => {
         if (settings.get('muted') || isPaused()) {
           log.debug('hotkey armed ignored (muted or paused)')
           return
@@ -106,16 +107,24 @@ app.whenReady().then(async () => {
         // Visual: overlay → armed (animation only; recording starts on overlay
         // when it sees hotkey:armed).
         broadcastOverlayState({ state: 'armed' })
-        broadcastHotkeyArmed({ hwndSnapshot: null })
+        broadcastHotkeyArmed({ hwndSnapshot: null, locked })
       },
-      onReleased: ({ holdDurationMs }) => {
+      onReleased: ({ holdDurationMs, fromLock }) => {
         if (settings.get('muted') || isPaused()) return
         // Visual: overlay → processing (overlay flips to processing right
         // after stopping its MediaRecorder, before the audio buffer arrives).
         // Broadcasting here makes the transition feel instant from the user's
         // POV even if the overlay's own state update lags a tick.
         broadcastOverlayState({ state: 'processing', meta: { label: 'transcrevendo…' } })
-        broadcastHotkeyReleased({ holdDurationMs, hwndSnapshot: null })
+        broadcastHotkeyReleased({ holdDurationMs, hwndSnapshot: null, fromLock })
+      },
+      onLockChanged: ({ locked, since }) => {
+        broadcastHotkeyLockChanged({
+          locked,
+          since,
+          // Cap surfaced to overlay so it can render the progress bar.
+          maxDurationMs: 60_000
+        })
       }
     })
   }

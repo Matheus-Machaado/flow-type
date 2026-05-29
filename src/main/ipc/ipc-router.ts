@@ -12,6 +12,8 @@ import type {
   OverlayPosition,
   WindowInfo,
   HotkeyBindingPayload,
+  HotkeyLockChangedPayload,
+  HotkeyForceUnlockPayload,
   Wo1Settings
 } from '@shared/ipc-types'
 
@@ -41,7 +43,10 @@ export function broadcastOverlayState(state: OverlayStatePayload): void {
   }
 }
 
-export function broadcastHotkeyArmed(payload: { hwndSnapshot: WindowInfo | null }): void {
+export function broadcastHotkeyArmed(payload: {
+  hwndSnapshot: WindowInfo | null
+  locked?: boolean
+}): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send(Channels.HotkeyArmed, payload)
   }
@@ -50,9 +55,16 @@ export function broadcastHotkeyArmed(payload: { hwndSnapshot: WindowInfo | null 
 export function broadcastHotkeyReleased(payload: {
   holdDurationMs: number
   hwndSnapshot: WindowInfo | null
+  fromLock?: boolean
 }): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send(Channels.HotkeyReleased, payload)
+  }
+}
+
+export function broadcastHotkeyLockChanged(payload: HotkeyLockChangedPayload): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    w.webContents.send(Channels.HotkeyLockChanged, payload)
   }
 }
 
@@ -85,6 +97,12 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(Channels.HotkeyTestCombo, () => {
     return { mode: hotkeyManager.getMode(), binding: settings.get('hotkey') }
+  })
+
+  // Overlay asks main to leave LOCK programmatically (e.g. 60s cap hit).
+  ipcMain.on(Channels.HotkeyForceUnlock, (_e, payload: HotkeyForceUnlockPayload) => {
+    if (!hotkeyManager.isLockActive()) return
+    hotkeyManager.forceUnlock(payload?.reason ?? 'user-cancel')
   })
 
   // ── App lifecycle ──────────────────────────────────────────────

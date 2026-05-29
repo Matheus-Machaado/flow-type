@@ -14,7 +14,9 @@ import {
   type OverlayStatePayload,
   type OverlayBadgePayload,
   type HotkeyArmedPayload,
-  type HotkeyReleasedPayload
+  type HotkeyReleasedPayload,
+  type HotkeyLockChangedPayload,
+  type HotkeyForceUnlockPayload
 } from '@shared/ipc-types'
 
 type Unsubscribe = () => void
@@ -59,6 +61,19 @@ const api = {
     const wrap = (_: unknown, p: HotkeyReleasedPayload): void => handler(p)
     ipcRenderer.on(Channels.HotkeyReleased, wrap)
     return () => ipcRenderer.removeListener(Channels.HotkeyReleased, wrap)
+  },
+  onHotkeyLockChanged: (handler: (p: HotkeyLockChangedPayload) => void): Unsubscribe => {
+    const wrap = (_: unknown, p: HotkeyLockChangedPayload): void => handler(p)
+    ipcRenderer.on(Channels.HotkeyLockChanged, wrap)
+    return () => ipcRenderer.removeListener(Channels.HotkeyLockChanged, wrap)
+  },
+  /**
+   * Overlay → main: ask main to force-exit LOCK (e.g. recording cap reached).
+   * Main will run forceUnlock(), which emits the standard released event so
+   * the rest of the pipeline (STT → inject → history) runs untouched.
+   */
+  requestForceUnlock: (payload: HotkeyForceUnlockPayload): void => {
+    ipcRenderer.send(Channels.HotkeyForceUnlock, payload)
   },
   /**
    * Send captured audio (webm/opus) to main for the full pipeline:

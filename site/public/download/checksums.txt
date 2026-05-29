@@ -1,2 +1,2 @@
-c239ce07769ad1d9542bf3dac750a0a89f9259ad38b75352e23fe1ffc1374efa  flowtype-setup-v0.1.6.exe
-97a7a19d3b313e81ded93c4b9e0ae877cc89007a16665387525a3fe28cbcb186  flowtype-portable-v0.1.6.exe
+f5fee0f98ca99aba0ef67f6c3f1e1c71d9a616f95b569b4e84af901a997bdc12  flowtype-setup-v0.1.7.exe
+1b16560c1b964fdad1ca6ae5aa6a29b4a510921cc7ba997a2be29b49046fa935  flowtype-portable-v0.1.7.exe

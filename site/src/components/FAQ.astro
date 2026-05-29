@@ -7,24 +7,32 @@ const faqs = [
     a: "Sim, 100% free e sem limite de uso. Nenhum cartão, nenhuma assinatura, nenhum trial. A transcrição roda via Groq Whisper Large v3 Turbo (free tier) ou via faster-whisper local quando offline. Você cadastra uma key gratuita em <a class='text-accent hover:underline' href='https://console.groq.com' target='_blank' rel='noopener'>console.groq.com</a> no onboarding (5 minutos, sem cartão).",
   },
   {
+    q: "Tem como gravar sem segurar a tecla?",
+    a: "Tem. Double-tap em <kbd class='font-mono'>Right Ctrl</kbd> (dois toques rápidos em até 350 ms) trava a gravação. O overlay mostra um chip 'lock' no canto e fica capturando até você tocar a tecla de novo (ou apertar Esc). Use pra desenvolver ideias mais longas sem ficar segurando. O modo push-to-talk tradicional (segurar e soltar) continua funcionando igual, sem nenhuma mudança.",
+  },
+  {
+    q: "Tem limite de duração por gravação?",
+    a: "Cada gravação tem cap de 60 segundos: a captura encerra sozinha quando bate o teto, no modo push-to-talk e no modo travado. Uma barra fina na base do overlay enche conforme o tempo passa e vira amber nos últimos 10 segundos pra você saber que tá perto do fim. Quantidade de gravações por dia continua ilimitada.",
+  },
+  {
     q: "Como funciona o fallback offline?",
     a: "O instalador inclui o modelo <code class='font-mono text-accent'>faster-whisper small.en</code> (~140 MB). Quando você está sem internet, ou quando ativa 'Forçar local sempre' nas Settings, a transcrição roda 100% no seu CPU. É mais lento (~3s vs sub-1s), mas funciona em avião, café sem Wi-Fi, ou pra áudio sensível que nunca pode sair da máquina.",
   },
   {
     q: "Roda no Mac ou Linux?",
-    a: "Não ainda. v0.1 é Windows-only (Windows 10 e 11). Mac e Linux estão no roadmap — o stack Electron + Whisper + nut.js teoricamente porta direto, mas o hotkey global e o paste universal precisam de uma rodada de testes por plataforma. Se você quer macOS ou Linux, abre uma issue no GitHub votando.",
+    a: "Não ainda. v0.1 é Windows-only (Windows 10 e 11). Mac e Linux estão no roadmap: o stack Electron + Whisper + nut.js teoricamente porta direto, mas o hotkey global e o paste universal precisam de uma rodada de testes por plataforma. Se você quer macOS ou Linux, abre uma issue no GitHub votando.",
   },
   {
     q: "Funciona em qualquer app mesmo?",
-    a: "Sim — qualquer campo de texto que aceita Ctrl+V. Testado em Claude, ChatGPT, Notepad, WhatsApp Web, Slack, VSCode, Cursor, terminais, browsers, campos de email, formulários. A injeção usa o pattern padrão do Windows (clipboard + paste simulado), então tudo que aceita colar normalmente aceita o Flow Type.",
+    a: "Sim, qualquer campo de texto que aceita Ctrl+V. Testado em Claude, ChatGPT, Notepad, WhatsApp Web, Slack, VSCode, Cursor, terminais, browsers, campos de email, formulários. A injeção usa o pattern padrão do Windows (clipboard + paste simulado), então tudo que aceita colar normalmente aceita o Flow Type.",
   },
   {
     q: "É open source?",
-    a: "Sim, MIT license. Código completo em <a class='text-accent hover:underline' href='https://github.com/flowtypeapp/flowtype' target='_blank' rel='noopener'>github.com/flowtypeapp/flowtype</a> (placeholder — repo final será publicado no release WO-8). Audite, modifique, fork — só não revenda como SaaS proprietário, por favor.",
+    a: "Sim, MIT license. Código completo em <a class='text-accent hover:underline' href='https://github.com/flowtypeapp/flowtype' target='_blank' rel='noopener'>github.com/flowtypeapp/flowtype</a> (placeholder, repo final será publicado no release WO-8). Audite, modifique, fork. Só não revenda como SaaS proprietário, por favor.",
   },
   {
     q: "Posso usar 100% offline / sem mandar áudio pra cloud?",
-    a: "Sim. Settings → STT Provider → toggle 'Forçar local sempre'. Quando ativo, a transcrição cloud é pulada e o áudio nunca sai da sua máquina — roda no faster-whisper local (small.en). Latência fica em torno de 3s em CPU de 4 cores.",
+    a: "Sim. Settings → STT Provider → toggle 'Forçar local sempre'. Quando ativo, a transcrição cloud é pulada e o áudio nunca sai da sua máquina: roda no faster-whisper local (small.en). Latência fica em torno de 3s em CPU de 4 cores.",
   },
   {
     q: "Onde meus áudios e transcrições ficam salvos?",

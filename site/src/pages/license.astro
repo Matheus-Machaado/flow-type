@@ -1,0 +1,65 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+const year = new Date().getFullYear();
+const licenseText = `MIT License
+
+Copyright (c) ${year} Matheus Machado
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+---
+
+<BaseLayout
+  title="Licença MIT | Flow Type"
+  description="Flow Type é distribuído sob licença MIT. Texto integral aqui."
+>
+  <Header />
+  <main id="main" class="max-w-3xl mx-auto px-6 py-16 sm:py-20">
+    <header class="mb-8">
+      <p class="text-xs font-mono text-muted uppercase tracking-wider mb-3">Legal</p>
+      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">Licença MIT</h1>
+      <p class="text-sm text-fg-soft mt-3 max-w-xl leading-relaxed">
+        O Flow Type é open-source sob licença MIT. Use, modifique, redistribua, inclusive
+        em produto comercial. Sem garantia. Atribuição requerida.
+      </p>
+    </header>
+
+    <pre
+      class="surface-card p-6 text-xs sm:text-sm font-mono text-fg-soft whitespace-pre-wrap leading-relaxed overflow-x-auto"
+    >{licenseText}</pre>
+
+    <div class="mt-8 flex flex-wrap items-center gap-4 text-xs text-muted">
+      <a
+        href="https://github.com/flowtypeapp/flowtype/blob/main/LICENSE"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:text-accent transition-colors inline-flex items-center gap-1.5"
+      >
+        Ver no GitHub
+      </a>
+      <span aria-hidden="true">·</span>
+      <a href="/terms" class="hover:text-accent transition-colors">Termos de uso</a>
+      <span aria-hidden="true">·</span>
+      <a href="/privacy" class="hover:text-accent transition-colors">Privacidade</a>
+    </div>
+  </main>
+  <Footer />
+</BaseLayout>

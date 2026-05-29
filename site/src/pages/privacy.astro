@@ -1,0 +1,140 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+const lastReview = "29 de maio de 2026";
+---
+
+<BaseLayout
+  title="Privacidade | Flow Type"
+  description="Como o Flow Type lida com áudio, transcrições e histórico. Tudo local, zero telemetria."
+>
+  <Header />
+  <main id="main" class="max-w-3xl mx-auto px-6 py-16 sm:py-20">
+    <header class="mb-10">
+      <p class="text-xs font-mono text-muted uppercase tracking-wider mb-3">Legal</p>
+      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">Política de privacidade</h1>
+      <p class="text-sm text-muted mt-3">Última revisão: {lastReview}</p>
+    </header>
+
+    <article class="space-y-8 text-sm text-fg-soft leading-relaxed">
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Resumo curto</h2>
+        <p>
+          O Flow Type roda 100% na sua máquina. Áudio, transcrições e histórico ficam no
+          seu disco. A única coisa que pode sair do seu PC é o áudio enviado ao Groq pra
+          transcrição em nuvem, e só se você não estiver no modo offline.
+        </p>
+        <p class="mt-3">
+          Nada é coletado pela gente, em momento nenhum. Sem analytics, sem telemetria,
+          sem servidor próprio.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">O que o Flow Type captura</h2>
+        <ul class="space-y-2 list-disc pl-5">
+          <li>
+            <strong class="text-fg">Áudio do microfone</strong>, só enquanto você segura
+            ou trava a hotkey (default: <kbd>Right Ctrl</kbd>). Fora desse intervalo o
+            microfone não está sendo lido pelo app.
+          </li>
+          <li>
+            <strong class="text-fg">Texto transcrito</strong>, que vai pro campo ativo
+            do app em foco e fica gravado no seu histórico local.
+          </li>
+          <li>
+            <strong class="text-fg">Metadados de execução</strong>: app em foco,
+            duração da gravação, provider usado (Groq ou local), latência. Tudo no seu
+            disco.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Onde os dados ficam</h2>
+        <p>
+          Tudo em <code class="font-mono text-accent">%APPDATA%/flowtype/</code> na sua
+          máquina. Resumo:
+        </p>
+        <ul class="space-y-2 list-disc pl-5 mt-3">
+          <li>
+            <code class="font-mono">flowtype.db</code>: SQLite com FTS5. Guarda
+            transcrições, vocabulário custom, settings e histórico de uso.
+          </li>
+          <li>
+            <code class="font-mono">recordings/YYYY-MM-DD/&lt;ulid&gt;.opus</code>:
+            áudios opcionalmente arquivados. Você define retenção (ex.: deletar áudios
+            com mais de 30 dias) em Settings.
+          </li>
+          <li>
+            <code class="font-mono">secrets.env</code>: suas keys da Groq. Em texto,
+            no seu disco. Ninguém mais lê.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Transcrição em nuvem (Groq)</h2>
+        <p>
+          Quando o provider é Groq Whisper Large v3 Turbo, o áudio sai do seu PC só pra
+          API da Groq, pra transcrição, e a resposta volta como texto. Não passa por
+          nenhum servidor nosso.
+        </p>
+        <p class="mt-3">
+          A política da Groq sobre dados de inferência está em
+          <a href="https://groq.com/privacy-policy/" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">groq.com/privacy-policy</a>.
+          Se isso te incomoda, ative <strong class="text-fg">Forçar local sempre</strong>
+          em Settings, ou desligue a internet. O Flow Type cai automaticamente no
+          faster-whisper local e nenhum áudio sai da sua máquina.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Modo offline</h2>
+        <p>
+          O instalador inclui o modelo <code class="font-mono">faster-whisper small.en</code>
+          (~140 MB). Com <em>Forçar local sempre</em> ligado, ou simplesmente sem
+          internet, o áudio é transcrito 100% na sua CPU, sem rede.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Coleta pela equipe Flow Type</h2>
+        <p>Zero. Não temos servidor, banco, analytics ou crash reporter remoto.</p>
+        <p class="mt-3">
+          O instalador NSIS não phone-home. O app rodando não phone-home. Updates são
+          baixados manualmente do site oficial.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Cookies, tracking, ads</h2>
+        <p>
+          O site oficial (este aqui) não usa cookies de tracking, não tem Google
+          Analytics, Facebook Pixel ou similar. Hospedado em Netlify, que loga IP por
+          requisição como qualquer CDN. Não vendemos dados, não temos publicidade.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Seus direitos</h2>
+        <p>
+          Como tudo fica no seu disco, você tem controle total: deletar a pasta
+          <code class="font-mono">%APPDATA%/flowtype/</code> apaga 100% dos dados gerados
+          pelo Flow Type. Sem pedido, sem espera.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-fg mb-3">Contato</h2>
+        <p>
+          Dúvida sobre privacidade ou pedido de esclarecimento:
+          <a href="mailto:matheus.machaado.dev@gmail.com" class="text-accent hover:underline">matheus.machaado.dev@gmail.com</a>.
+        </p>
+      </section>
+    </article>
+  </main>
+  <Footer />
+</BaseLayout>

@@ -5,7 +5,17 @@ const features = [
   {
     icon: "keyboard",
     title: "Hotkey global",
-    body: "Right Ctrl default, customizável. Detecção robusta de hold/release via uIOhook nativo.",
+    body: "Right Ctrl default, customizável. Segure pra falar (push-to-talk) ou double-tap pra travar gravando. uIOhook nativo.",
+  },
+  {
+    icon: "lock",
+    title: "Modo travado",
+    body: "Dois toques rápidos travam a gravação pra falar livre sem segurar a tecla. Qualquer toque depois encerra.",
+  },
+  {
+    icon: "clock",
+    title: "Cap de 60s por gravação",
+    body: "A gravação encerra sozinha ao bater 60 segundos. Barra de progresso na base do overlay avisa nos últimos 10s.",
   },
   {
     icon: "bolt",
@@ -35,7 +45,7 @@ const features = [
   {
     icon: "power",
     title: "Auto-start Windows",
-    body: "Liga junto com o login. Roda silencioso no tray — abre Settings ou Histórico on-demand.",
+    body: "Liga junto com o login. Roda silencioso no tray; abre Settings ou Histórico on-demand.",
   },
   {
     icon: "code",
@@ -45,7 +55,7 @@ const features = [
   {
     icon: "shield",
     title: "Privacy-aware",
-    body: "Toggle 'forçar local sempre' — nenhum áudio sai da máquina. Open source, auditável.",
+    body: "Toggle 'forçar local sempre': nenhum áudio sai da máquina. Open source, auditável.",
   },
 ];
 ---
@@ -54,7 +64,7 @@ const features = [
   <div class="max-w-6xl mx-auto px-6 py-16 sm:py-20">
     <div class="text-center mb-10">
       <h2 id="features-h2" class="text-3xl sm:text-4xl font-semibold tracking-tight">Features</h2>
-      <p class="text-sm text-muted mt-3">9 capacidades pensadas pra quem digita o dia inteiro.</p>
+      <p class="text-sm text-muted mt-3">11 capacidades pensadas pra quem digita o dia inteiro.</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
