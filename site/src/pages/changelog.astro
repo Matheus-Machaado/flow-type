@@ -31,6 +31,20 @@ const groupColor: Record<ChangeGroup["type"], string> = {
 
 const releases: Release[] = [
   {
+    version: "0.1.8",
+    date: "2026-06-16",
+    groups: [
+      {
+        type: "fixed",
+        items: [
+          "Hotkey aceita qualquer tecla, não só uma lista fixa. Antes só funcionavam Right/Left Ctrl e algumas F; qualquer outra era cadastrada mas nunca disparava. Em PC sem Ctrl direito (notebook/netbook), dá pra usar AltGr, qualquer F ou outra tecla, e funciona de verdade. A tecla agora é guardada pelo código físico, então se adapta a qualquer máquina.",
+          "Quem já tinha escolhido AltGr e não disparava passa a funcionar sem recadastrar (o valor antigo é corrigido sozinho).",
+          "Onboarding e tela inicial mostram a tecla com nome amigável (AltGr, Ctrl direito...).",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.1.7",
     date: "2026-05-29",
     groups: [

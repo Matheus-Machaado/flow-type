@@ -2,6 +2,13 @@
 
 Todas as mudanças notáveis do Flow Type ficam aqui. Formato: [Keep a Changelog](https://keepachangelog.com/pt-BR/), versionamento [SemVer](https://semver.org/).
 
+## [0.1.8] — 2026-06-16
+
+### Corrigido
+- **Hotkey aceita qualquer tecla, não só uma lista fixa.** Antes só funcionavam Right/Left Ctrl e algumas F (F8, F9, F12); qualquer outra tecla era cadastrada mas nunca disparava. Em PC sem Ctrl direito (notebook/netbook), dá pra usar **AltGr**, qualquer **F** ou outra tecla, e ela funciona de verdade. A tecla agora é guardada pelo código físico (independente de layout/teclado), então se adapta a qualquer máquina.
+- Quem já tinha escolhido AltGr e não disparava passa a funcionar **sem recadastrar** (o valor antigo é corrigido sozinho).
+- Onboarding e tela inicial mostram a tecla com nome amigável ("AltGr", "Ctrl direito"...).
+
 ## [0.1.7] — 2026-05-29
 
 ### Adicionado
