@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
+import { eventToCode, displayLabel } from '@shared/hotkey-keys'
 import { Button } from '../../shared/components/Button'
 
 /**
- * HotkeyCapture — captura combo viva via keydown global enquanto em foco.
+ * HotkeyCapture — captura UMA tecla física (push-to-talk) via keydown global
+ * enquanto em foco. Grava o `KeyboardEvent.code` canônico (independente de
+ * layout/PC) e exibe um label amigável.
  *
- * Estados: idle (mostra valor atual) · capturing (pulsa cyan) · detected
- * (mostra nova combo + salvar/cancelar). Esc cancela, Enter confirma.
+ * Estados: idle (mostra tecla atual) · capturing (pulsa cyan, "pressione…")
+ * · detected (mostra tecla nova + salvar/cancelar). Esc cancela.
  *
- * NÃO valida conflitos com hotkeys do sistema — isso fica com o main process
- * via `hotkey:set-binding` (que rebinda + reporta erro se conflito).
+ * Aceita qualquer tecla suportada: AltGr, Ctrl/Shift/Alt direito ou esquerdo,
+ * F1–F24, letras, etc. Teclas não suportadas e o Ctrl fantasma do AltGr são
+ * ignorados (segue aguardando). NÃO valida conflitos com o sistema — isso
+ * fica com o main process via `hotkey:set-binding`.
  */
 export function HotkeyCapture({
   current,
   onSave
 }: {
   current: string
-  onSave: (combo: string) => Promise<void> | void
+  onSave: (code: string) => Promise<void> | void
 }): JSX.Element {
   const [mode, setMode] = useState<'idle' | 'capturing' | 'detected'>('idle')
   const [detected, setDetected] = useState<string>('')
@@ -30,28 +35,17 @@ export function HotkeyCapture({
         setMode('idle')
         return
       }
-      if (e.key === 'Enter' && detected) {
-        void confirm(detected)
-        return
-      }
-      const parts: string[] = []
-      if (e.ctrlKey) parts.push('Ctrl')
-      if (e.shiftKey) parts.push('Shift')
-      if (e.altKey) parts.push('Alt')
-      if (e.metaKey) parts.push('Meta')
-      const key = normalizeKey(e.key, e.code)
-      if (key && !parts.includes(key)) parts.push(key)
-      if (parts.length > 0) setDetected(parts.join('+'))
-      if (parts.length > 0 && !isModifierOnly(key)) {
-        setMode('detected')
-      }
+      const code = eventToCode(e)
+      if (!code) return // phantom / tecla não suportada → segue aguardando
+      setDetected(code)
+      setMode('detected')
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [mode, detected])
+  }, [mode])
 
-  async function confirm(combo: string): Promise<void> {
-    await onSave(combo)
+  async function confirm(code: string): Promise<void> {
+    await onSave(code)
     setMode('idle')
     setDetected('')
   }
@@ -67,7 +61,11 @@ export function HotkeyCapture({
               : 'inline-flex items-center px-2.5 py-1 rounded-md bg-surface text-accent border border-border font-mono text-xs'
         }
       >
-        {mode === 'capturing' ? 'pressione…' : mode === 'detected' ? detected : current}
+        {mode === 'capturing'
+          ? 'pressione…'
+          : mode === 'detected'
+            ? displayLabel(detected)
+            : displayLabel(current)}
       </span>
 
       {mode === 'idle' ? (
@@ -90,19 +88,4 @@ export function HotkeyCapture({
       )}
     </div>
   )
-}
-
-function normalizeKey(key: string, code: string): string {
-  if (key === 'Control' || code === 'ControlRight') return code === 'ControlRight' ? 'Right Ctrl' : 'Ctrl'
-  if (key === 'Shift') return 'Shift'
-  if (key === 'Alt') return 'Alt'
-  if (key === 'Meta') return 'Meta'
-  if (key === ' ') return 'Space'
-  if (key.startsWith('F') && /^F\d+$/.test(key)) return key
-  if (key.length === 1) return key.toUpperCase()
-  return key
-}
-
-function isModifierOnly(key: string): boolean {
-  return ['Ctrl', 'Shift', 'Alt', 'Meta', 'Right Ctrl'].includes(key)
 }

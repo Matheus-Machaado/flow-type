@@ -23,6 +23,12 @@
 
 import { app, globalShortcut } from 'electron'
 import { createLogger } from '@shared/logger'
+import {
+  CODE_TO_UIOHOOK_NAME,
+  codeToElectronAccelerator,
+  displayLabel,
+  normalizeBinding
+} from '@shared/hotkey-keys'
 import * as settings from '../state/settings-store'
 
 const log = createLogger('hotkey-manager')
@@ -53,15 +59,6 @@ type UiohookModule = {
     stop: () => void
   }
   UiohookKey: Record<string, number>
-}
-
-// uIOhook keycode names we accept. Matches uiohook-napi `UiohookKey` enum.
-const KEYCODE_MAP_NAMES: Record<string, string[]> = {
-  'Right Ctrl': ['RightControl', 'CtrlRight'],
-  'Left Ctrl': ['Ctrl', 'CtrlLeft', 'LeftControl'],
-  F12: ['F12'],
-  F8: ['F8'],
-  F9: ['F9']
 }
 
 class HotkeyManager {
@@ -109,12 +106,15 @@ class HotkeyManager {
 
   private resolveKeycode(binding: string): number | null {
     if (!this.uio) return null
-    const names = KEYCODE_MAP_NAMES[binding] ?? []
-    for (const n of names) {
-      const k = this.uio.UiohookKey[n]
-      if (typeof k === 'number') return k
+    const code = normalizeBinding(binding)
+    const name = CODE_TO_UIOHOOK_NAME[code]
+    if (!name) {
+      log.warn('no uIOhook mapping for binding', { binding, code })
+      return null
     }
-    log.warn('no uIOhook keycode for binding', { binding, tried: names })
+    const k = this.uio.UiohookKey[name]
+    if (typeof k === 'number') return k
+    log.warn('uIOhook enum missing key for binding', { binding, code, name })
     return null
   }
 
@@ -134,7 +134,11 @@ class HotkeyManager {
       mod.uIOhook.on('keyup', (e) => this.handleUp(e))
       mod.uIOhook.start()
       this.mode = 'uiohook'
-      log.info('hotkey-manager started in uiohook mode', { binding: this.currentBinding, keycode })
+      log.info('hotkey-manager started in uiohook mode', {
+        binding: this.currentBinding,
+        label: displayLabel(this.currentBinding),
+        keycode
+      })
       return true
     } catch (e) {
       log.warn('uIOhook failed to load — using Electron globalShortcut fallback', {
@@ -179,13 +183,11 @@ class HotkeyManager {
   }
 
   private toElectronAccelerator(binding: string): string {
-    // Electron's globalShortcut doesn't distinguish Right/Left Ctrl; we just
-    // register Ctrl as a synthetic fallback so the app remains functional.
-    if (binding === 'Right Ctrl' || binding === 'Left Ctrl') return 'CommandOrControl+Alt+Space'
-    if (binding === 'F12') return 'F12'
-    if (binding === 'F8') return 'F8'
-    if (binding === 'F9') return 'F9'
-    return binding
+    // Electron's globalShortcut can't bind bare modifiers and doesn't
+    // distinguish Right/Left; the shared helper collapses those to a
+    // synthetic combo and passes through F-keys / letters / digits so the
+    // app stays usable when uIOhook is unavailable.
+    return codeToElectronAccelerator(binding)
   }
 
   private handleDown(e: UiohookKeyEvent): void {

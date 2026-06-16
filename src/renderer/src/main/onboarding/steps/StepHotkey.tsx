@@ -7,6 +7,7 @@ import { Badge } from '../../../shared/components/Badge'
 import { HotkeyCapture } from '../../settings/HotkeyCapture'
 import { getBridge } from '../../../shared/hooks/useBridge'
 import { cn } from '../../../shared/lib/cn'
+import { eventToCode, displayLabel, normalizeBinding } from '@shared/hotkey-keys'
 
 type TestState = 'idle' | 'armed' | 'released'
 
@@ -65,27 +66,22 @@ export function StepHotkey({
 
   // Renderer-fallback test (no bridge): listen for the configured key in
   // the renderer window. Only used when running outside Electron (audit
-  // harness / preview server). We approximate Right Ctrl with key === 'Control'
-  // and event.code === 'ControlRight'.
+  // harness / preview server). Matches by canonical physical code so ANY
+  // bound key (AltGr, F-key, letter, …) lights up — same model the main
+  // process uses, just sourced from DOM events here.
   useEffect(() => {
     if (bridge) return
-    const isRightCtrl = hotkey.toLowerCase().includes('right ctrl')
+    const target = normalizeBinding(hotkey)
     let armedAt = 0
     function onDown(e: KeyboardEvent): void {
       if (e.repeat) return
-      const match = isRightCtrl
-        ? e.code === 'ControlRight'
-        : e.key.toLowerCase() === hotkey.toLowerCase()
-      if (!match) return
+      if (eventToCode(e) !== target) return
       armedAt = Date.now()
       setTestState('armed')
       setHoldMs(null)
     }
     function onUp(e: KeyboardEvent): void {
-      const match = isRightCtrl
-        ? e.code === 'ControlRight'
-        : e.key.toLowerCase() === hotkey.toLowerCase()
-      if (!match || armedAt === 0) return
+      if (eventToCode(e) !== target || armedAt === 0) return
       const dur = Date.now() - armedAt
       armedAt = 0
       setTestState('released')
@@ -123,7 +119,7 @@ export function StepHotkey({
       stepIndex={2}
       totalSteps={4}
       title="Calibração de hotkey"
-      subtitle="A tecla pra ativar transcrição. Padrão: Right Ctrl — raramente usada, não bate com nada."
+      subtitle="A tecla pra ativar transcrição. Padrão: Ctrl direito — raramente usada, não bate com nada. Sem Ctrl direito? Use AltGr, um F ou qualquer tecla."
       primaryLabel="Próximo"
       onPrimary={onNext}
       onBack={onBack}
@@ -144,7 +140,7 @@ export function StepHotkey({
               </div>
               <div className="flex items-baseline gap-2">
                 <strong className="text-lg font-mono font-semibold text-accent">
-                  {hotkey}
+                  {displayLabel(hotkey)}
                 </strong>
                 <span className="text-[10px] text-text-muted">
                   raramente usada — não bate com nada
@@ -194,7 +190,7 @@ export function StepHotkey({
             />
             <p className="text-[11px] text-text-secondary leading-relaxed flex-1">
               {testState === 'idle'
-                ? `Segure ${hotkey} agora pra ver o indicador acender. Solte pra confirmar.`
+                ? `Segure ${displayLabel(hotkey)} agora pra ver o indicador acender. Solte pra confirmar.`
                 : testState === 'armed'
                   ? 'Captando… solte a tecla quando estiver pronto.'
                   : `Funcionou! Mantida por ${holdMs ?? '—'}ms.`}

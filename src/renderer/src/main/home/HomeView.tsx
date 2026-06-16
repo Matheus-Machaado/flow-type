@@ -5,6 +5,7 @@ import { Badge } from '../../shared/components/Badge'
 import { Toggle } from '../../shared/components/Toggle'
 import { getBridge } from '../../shared/hooks/useBridge'
 import { FlowTypeMark } from '../shell/FlowTypeMark'
+import { displayLabel } from '@shared/hotkey-keys'
 import type { RouteId } from '../App'
 
 interface SettingsShape {
@@ -95,7 +96,7 @@ export function HomeView({ onNavigate }: { onNavigate: (to: RouteId) => void }):
           </div>
           <div className="flex items-baseline gap-2">
             <code className="px-2.5 py-1 rounded-md bg-surface text-accent font-mono text-sm border border-border">
-              {settings.hotkey ?? 'Right Ctrl'}
+              {displayLabel(settings.hotkey)}
             </code>
             <span className="text-[10px] text-text-muted">
               segure pra gravar, solte pra enviar
